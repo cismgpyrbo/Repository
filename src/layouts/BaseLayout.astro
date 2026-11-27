@@ -1,0 +1,26 @@
+---
+import '../styles/global.css';
+const { title = '拾光誌｜在日常裡拾起值得記錄的光', description = '一個記錄生活、閱讀、工作與創作的個人部落格。' } = Astro.props;
+---
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f7f7f2" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="/">拾光誌</a>
+        <nav class="nav" aria-label="主要導覽">
+          <a href="/">首頁</a><a href="/blog/">所有文章</a><a href="/about/">關於</a><a href="/contact/">聯絡</a>
+        </nav>
+      </div>
+    </header>
+    <slot />
+    <footer class="site-footer"><div class="container">© 2026 拾光誌 · 在日常裡拾起值得記錄的光</div></footer>
+  </body>
+</html>
