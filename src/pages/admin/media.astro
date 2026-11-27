@@ -251,14 +251,14 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     .form-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
     .form-actions .button{margin:0}
     .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:12px}
-    .media-card{border:1px solid var(--line);background:#fffefa;min-width:0;border-radius:8px;overflow:hidden}
-    .media-card>img{display:block;width:100%;aspect-ratio:1;height:auto;object-fit:contain;background:#f0f0eb;padding:5px;cursor:zoom-in}
-    .media-card-body{padding:7px;display:grid;gap:5px;min-width:0}
-    .media-card-body strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
-    .media-card-body small{color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .media-card-body p{font-size:10px;margin:0;min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .media-actions{display:flex;gap:7px;flex-wrap:wrap}
-    .media-actions button{font:inherit;font-size:10px;padding:2px 0}
+    :global(.media-card){border:1px solid var(--line);background:#fffefa;min-width:0;border-radius:8px;overflow:hidden}
+    :global(.media-card>img){display:block;width:100%;max-width:100%;aspect-ratio:1;height:auto;max-height:116px;object-fit:contain;background:#f0f0eb;padding:5px;cursor:zoom-in;box-sizing:border-box}
+    :global(.media-card-body){padding:7px;display:grid;gap:5px;min-width:0}
+    :global(.media-card-body strong){display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+    :global(.media-card-body small){display:block;color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    :global(.media-card-body p){font-size:10px;margin:0;min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    :global(.media-actions){display:flex;gap:7px;flex-wrap:wrap}
+    :global(.media-actions button){font:inherit;font-size:10px;padding:2px 0}
     .danger-link{color:#a33b32}
     .media-dialog{width:min(560px,calc(100% - 28px));border:1px solid var(--line);padding:24px;background:#fffefa;color:#26342d}
     .media-dialog::backdrop{background:#18231dcc}
@@ -272,7 +272,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     @media(max-width:700px){
       .upload-form{grid-template-columns:1fr}.form-span-2{grid-column:auto}
       .media-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-      .media-card-body{padding:6px}.media-actions{gap:6px}
+      :global(.media-card-body){padding:6px}:global(.media-actions){gap:6px}
     }
   </style>
 </BaseLayout>
