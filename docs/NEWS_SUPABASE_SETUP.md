@@ -1,9 +1,28 @@
-# News Center Database Setup
+# 拾光誌 Supabase 設定與部署
 
-1. Confirm this is the intended Supabase project and create a database backup.
-2. Create the administrator account in Supabase Auth.
-3. Open Supabase SQL Editor and apply `supabase/migrations/202611270001_create_news_tables.sql`.
-4. Copy the administrator's Auth user UUID and run the bootstrap INSERT at the bottom of the migration.
-5. Test with anon and authenticated sessions before connecting the website.
+## 目標專案
+沿用既有 Supabase 專案（Project Ref: `aaynitbvfhxttrmlmvlf`）。此專案同時承載其他系統；本次 Migration 僅建立 `blog_*` 資料表、函式、政策及 `blog-media` Storage bucket，不應更動既有 `acc_*`、`checkin_*`、`maocheng_*` 或 `shareholders` 物件。
 
-Important: this repository change only adds SQL and documentation. It does not connect to or modify your live Supabase project.
+## 執行前
+1. 在 Supabase Dashboard 確認專案參照碼為 `aaynitbvfhxttrmlmvlf`。
+2. 建立資料庫備份。
+3. 在 Authentication > Users 建立網站管理者帳號。
+4. 不要將資料庫密碼、service-role/secret key 貼到聊天或放入 GitHub。
+
+## 執行 Migration
+1. 開啟 SQL Editor > New query。
+2. 開啟 GitHub 專案中的 `supabase/migrations/202611270001_create_blog_platform.sql`。
+3. 複製完整 SQL，貼入 SQL Editor。
+4. 執行後確認所有 `blog_*` 資料表與 `blog-media` Storage bucket 已建立。
+5. 取得剛建立的 Auth 使用者 UUID，在 SQL Editor 執行 Migration 最後的 bootstrap INSERT 範例（填入自己的 UUID）。
+
+## 權限驗證
+- 未登入訪客只能讀取已發布文章/新聞、公開網站設定及啟用中的圖片資料。
+- 未列入 `blog_admins` 的登入使用者不得管理內容。
+- 管理者可管理文章、新聞、分類、標籤、設定及圖片。
+- 操作紀錄只允許管理者讀取及新增；一般瀏覽器角色不可更新或刪除。
+- Storage 的 `blog-media` 可公開讀取；只有管理者可上傳、更新、刪除。
+- 測試期間不得修改其他專案資料表或政策。
+
+## 重要限制
+此 GitHub Migration 是 SQL 原始檔，提交到 GitHub 不會自動執行到 Supabase。執行前請先備份並檢查 SQL；本次建立檔案不會連線或修改線上資料庫。
