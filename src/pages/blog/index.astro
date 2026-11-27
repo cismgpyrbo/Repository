@@ -15,7 +15,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
     const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
     const $=s=>document.querySelector(s);let posts=[];let categories=[];let media=new Map();let category='all';
-    const articleUrl=slug=>'/blog/article/?slug='+encodeURIComponent(slug);
+    const siteBase=(document.querySelector('base')?.getAttribute('href')||'/').replace(/\/?$/,'/');const articleUrl=slug=>siteBase+'blog/article/?slug='+encodeURIComponent(slug);
     const imgUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1000&q=80';
     function render(){
       const q=($('#post-search').value||'').trim().toLowerCase();const grid=$('#post-grid');grid.replaceChildren();let shown=0;
