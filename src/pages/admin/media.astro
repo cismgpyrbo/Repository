@@ -169,12 +169,16 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if(!editing) return;
       const button=$('#save-edit');button.disabled=true;
       try {
-        const user=await verifyAdmin();
+        await verifyAdmin();
         const requestedName=$('#edit-file-name').value.trim();
         const oldName=editing.file_name;
-        const extension=(oldName.match(/\\.[^.]+$/)||[''])[0];
-        const stem=requestedName.replace(/\\.[^.]+$/,'').trim();
-        const safeStem=stem.normalize('NFC').replace(/[\\/\\\\\\0-\\x1f\\x7f]/g,'-').replace(/\\s+/g,' ').replace(/^\\.+|\\.+$/g,'').slice(0,140);
+        const extension=(oldName.match(/\.[^.]+$/)||[''])[0];
+        const stem=requestedName.replace(/\.[^.]+$/,'').trim();
+        const safeStem=stem.normalize('NFC')
+          .replace(/[\/\\\0-\x1f\x7f]/g,'-')
+          .replace(/\s+/g,' ')
+          .replace(/^\.+|\.+$/g,'')
+          .slice(0,140);
         if(!safeStem) throw new Error('請輸入有效的檔案名稱。');
         const newName=safeStem+extension;
         const oldPath=editing.storage_path;
