@@ -1,14 +1,289 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { posts } from '../../data/posts';
 ---
 <BaseLayout title="文章管理｜拾光誌">
-  <main class="container admin-shell"><div class="eyebrow">CONTENT MANAGEMENT</div><h1 class="serif">文章管理</h1><p class="muted">展示版操作不會寫入資料庫。</p><div class="admin-panel"><div class="section-heading"><h2 class="serif">文章列表</h2><button class="button" id="new-post">＋ 新增文章</button></div><div class="search-row"><input id="admin-search" placeholder="搜尋文章…" aria-label="搜尋文章"/><select id="status-filter" style="padding:12px;border:1px solid var(--line)"><option value="all">所有狀態</option><option value="published">已發布</option></select></div><table class="admin-table"><thead><tr><th>標題</th><th>分類</th><th>狀態</th><th>發布日期</th><th>操作</th></tr></thead><tbody id="admin-rows">{posts.map(p=><tr data-title={p.title.toLowerCase()}><td>{p.title}</td><td>{p.category}</td><td><span class="status">已發布</span></td><td>{p.date}</td><td><button class="text-link edit-post" type="button">編輯</button></td></tr>)}</tbody></table></div></main>
-  <script>
-    const search=document.querySelector<HTMLInputElement>('#admin-search');
-    const rows=[...document.querySelectorAll<HTMLTableRowElement>('#admin-rows tr')];
-    search?.addEventListener('input',()=>{const q=(search.value??'').toLowerCase();rows.forEach(r=>r.hidden=!(r.dataset.title??'').includes(q))});
-    document.querySelector('#new-post')?.addEventListener('click',()=>alert('展示版：正式版將開啟文章編輯器。'));
-    document.querySelectorAll('.edit-post').forEach(b=>b.addEventListener('click',()=>alert('展示版：正式版將載入文章編輯器。')));
+  <main class="container admin-shell">
+    <div class="eyebrow">CONTENT MANAGEMENT</div>
+    <div class="section-heading">
+      <div><h1 class="serif">文章管理</h1><p class="muted">文章資料直接儲存於 Supabase。公開網站目前仍採靜態頁面，發布後尚需網站重建才會更新前台。</p></div>
+      <button class="button" id="new-post" type="button">＋ 新增文章</button>
+    </div>
+
+    <section class="admin-panel" id="editor-panel" hidden>
+      <div class="section-heading"><h2 class="serif" id="editor-heading">新增文章</h2><button class="category-chip" id="close-editor" type="button">關閉</button></div>
+      <form id="post-form" class="admin-form">
+        <input id="post-id" type="hidden" />
+        <div class="form-grid">
+          <label class="form-field form-span-2">文章標題<input id="post-title" required maxlength="200" placeholder="輸入文章標題" /></label>
+          <label class="form-field">網址代稱（Slug）<input id="post-slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="my-first-post" /><small>僅使用小寫英文字母、數字與連字號。</small></label>
+          <label class="form-field">文章分類<select id="post-category"><option value="">未分類</option></select></label>
+          <label class="form-field form-span-2">文章摘要<textarea id="post-excerpt" rows="2" maxlength="500" placeholder="顯示於文章列表的摘要"></textarea></label>
+          <label class="form-field form-span-2">文章內容<textarea id="post-content" rows="12" placeholder="每段文字以空白行分隔。可先輸入純文字；Markdown 前台呈現會在後續整合。"></textarea></label>
+          <label class="form-field">文章狀態<select id="post-status"><option value="draft">草稿</option><option value="published">已發布</option><option value="archived">已封存</option></select></label>
+          <label class="form-field">文章標籤<input id="post-tags" placeholder="生活、閱讀、創作（以逗號分隔）" /></label>
+          <label class="form-field form-span-2">SEO 標題<input id="post-seo-title" maxlength="200" placeholder="留白時使用文章標題" /></label>
+          <label class="form-field form-span-2">SEO 描述<textarea id="post-seo-description" rows="2" maxlength="320" placeholder="搜尋結果摘要"></textarea></label>
+          <label class="form-check form-span-2"><input id="post-featured" type="checkbox" /> 設為精選文章</label>
+        </div>
+        <div class="form-actions"><button class="button" id="save-post" type="submit">儲存文章</button><button class="category-chip" id="cancel-edit" type="button">取消</button><span id="form-message" class="muted" role="status" aria-live="polite"></span></div>
+      </form>
+    </section>
+
+    <section class="admin-panel">
+      <div class="section-heading"><h2 class="serif">文章列表</h2><span id="post-count" class="muted">載入中…</span></div>
+      <div class="search-row">
+        <input id="admin-search" type="search" placeholder="搜尋標題、摘要或網址代稱…" aria-label="搜尋文章" />
+        <select id="status-filter" aria-label="依狀態篩選"><option value="all">所有狀態</option><option value="draft">草稿</option><option value="published">已發布</option><option value="archived">已封存</option></select>
+      </div>
+      <div class="table-scroll"><table class="admin-table"><thead><tr><th>文章標題</th><th>分類</th><th>狀態</th><th>更新時間</th><th>操作</th></tr></thead><tbody id="admin-rows"><tr><td colspan="5">正在讀取資料…</td></tr></tbody></table></div>
+      <p id="list-message" class="muted" role="status"></p>
+    </section>
+
+    <section class="admin-panel">
+      <div class="section-heading"><h2 class="serif">文章分類</h2><span class="muted">管理文章可選用的分類</span></div>
+      <form id="category-form" class="category-create">
+        <label class="form-field">分類名稱<input id="category-name" required maxlength="80" placeholder="例如：旅行紀錄" /></label>
+        <label class="form-field">網址代稱<input id="category-slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="travel-notes" /></label>
+        <button class="button" type="submit">新增分類</button>
+      </form>
+      <div id="category-list" class="category-list"></div>
+    </section>
+  </main>
+
+  <script is:inline type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const supabase = createClient('https://aaynitbvfhxttrmlmvlf.supabase.co', 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a', {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+
+    const $ = (selector) => document.querySelector(selector);
+    const editor = $('#editor-panel');
+    const form = $('#post-form');
+    const message = $('#form-message');
+    const saveButton = $('#save-post');
+    let sessionUser = null;
+    let posts = [];
+    let categories = [];
+    let tags = [];
+    let postTags = [];
+
+    const slugify = (value) => {
+      const slug = value.toLowerCase().normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      return slug || 'post-' + Date.now().toString(36);
+    };
+    const escapeText = (value) => String(value ?? '');
+    const statusLabel = (value) => ({draft:'草稿',published:'已發布',archived:'已封存'}[value] || value);
+    const formatDate = (value) => value ? new Date(value).toLocaleString('zh-TW',{hour12:false}) : '—';
+    const setMessage = (text, error=false) => {
+      message.textContent = text;
+      message.style.color = error ? '#a33b32' : '';
+    };
+
+    function renderCategories() {
+      const select = $('#post-category');
+      select.replaceChildren(new Option('未分類',''));
+      categories.filter(c=>c.is_active).forEach(c=>select.add(new Option(c.name,c.id)));
+      const list = $('#category-list');
+      list.replaceChildren();
+      categories.forEach(category => {
+        const chip = document.createElement('span');
+        chip.className = 'category-chip';
+        chip.textContent = category.name + (category.is_active ? '' : '（已停用）');
+        list.append(chip);
+      });
+    }
+
+    function renderPosts() {
+      const query = ($('#admin-search').value || '').trim().toLowerCase();
+      const status = $('#status-filter').value;
+      const rows = $('#admin-rows');
+      rows.replaceChildren();
+      const filtered = posts.filter(post => {
+        const matchesQuery = [post.title,post.slug,post.excerpt].join(' ').toLowerCase().includes(query);
+        return matchesQuery && (status === 'all' || post.status === status);
+      });
+      $('#post-count').textContent = '共 ' + posts.length + ' 篇，顯示 ' + filtered.length + ' 篇';
+      if (!filtered.length) {
+        const tr=document.createElement('tr'), td=document.createElement('td');
+        td.colSpan=5; td.textContent='目前沒有符合條件的文章。'; tr.append(td); rows.append(tr); return;
+      }
+      filtered.forEach(post => {
+        const tr=document.createElement('tr');
+        const title=document.createElement('td'); title.textContent=post.title; 
+        const category=document.createElement('td'); category.textContent=categories.find(c=>c.id===post.category_id)?.name || '未分類';
+        const statusCell=document.createElement('td'); const badge=document.createElement('span'); badge.className='status'; badge.textContent=statusLabel(post.status); statusCell.append(badge);
+        const updated=document.createElement('td'); updated.textContent=formatDate(post.updated_at);
+        const actions=document.createElement('td');
+        const edit=document.createElement('button'); edit.type='button'; edit.className='text-link'; edit.textContent='編輯'; edit.addEventListener('click',()=>openEditor(post));
+        const remove=document.createElement('button'); remove.type='button'; remove.className='text-link danger-link'; remove.textContent='刪除'; remove.style.marginLeft='14px'; remove.addEventListener('click',()=>deletePost(post));
+        actions.append(edit,remove); tr.append(title,category,statusCell,updated,actions); rows.append(tr);
+      });
+    }
+
+    async function loadData() {
+      $('#list-message').textContent='正在載入 Supabase 資料…';
+      const [categoryResult,postResult,tagResult,postTagResult] = await Promise.all([
+        supabase.from('blog_categories').select('id,name,slug,is_active,sort_order').order('sort_order'),
+        supabase.from('blog_posts').select('id,title,slug,excerpt,content,category_id,status,is_featured,seo_title,seo_description,published_at,created_at,updated_at').order('updated_at',{ascending:false}),
+        supabase.from('blog_tags').select('id,name,slug').order('name'),
+        supabase.from('blog_post_tags').select('post_id,tag_id')
+      ]);
+      const firstError = categoryResult.error || postResult.error || tagResult.error || postTagResult.error;
+      if (firstError) throw firstError;
+      categories=categoryResult.data || [];
+      posts=postResult.data || [];
+      tags=tagResult.data || [];
+      postTags=postTagResult.data || [];
+      renderCategories(); renderPosts();
+      $('#list-message').textContent='資料已同步。';
+    }
+
+    function openEditor(post=null) {
+      form.reset();
+      $('#post-id').value=post?.id || '';
+      $('#editor-heading').textContent=post ? '編輯文章' : '新增文章';
+      $('#post-title').value=post?.title || '';
+      $('#post-slug').value=post?.slug || '';
+      $('#post-excerpt').value=post?.excerpt || '';
+      $('#post-content').value=post?.content || '';
+      $('#post-category').value=post?.category_id || '';
+      $('#post-status').value=post?.status || 'draft';
+      $('#post-featured').checked=!!post?.is_featured;
+      $('#post-seo-title').value=post?.seo_title || '';
+      $('#post-seo-description').value=post?.seo_description || '';
+      const names = post ? postTags.filter(x=>x.post_id===post.id).map(x=>tags.find(t=>t.id===x.tag_id)?.name).filter(Boolean) : [];
+      $('#post-tags').value=names.join('、');
+      setMessage('');
+      editor.hidden=false;
+      editor.scrollIntoView({behavior:'smooth',block:'start'});
+      $('#post-title').focus();
+    }
+
+    function closeEditor() { editor.hidden=true; form.reset(); }
+
+    async function savePost(event) {
+      event.preventDefault();
+      if (!sessionUser) { setMessage('登入狀態已失效，請重新登入。',true); return; }
+      const title=$('#post-title').value.trim();
+      const slug=$('#post-slug').value.trim().toLowerCase();
+      if (!title) { setMessage('請輸入文章標題。',true); return; }
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) { setMessage('網址代稱格式錯誤，請使用小寫英文、數字及連字號。',true); return; }
+      const status=$('#post-status').value;
+      const old=posts.find(p=>p.id===$('#post-id').value);
+      const payload={
+        title,slug,
+        excerpt:$('#post-excerpt').value.trim(),
+        content:$('#post-content').value,
+        category_id:$('#post-category').value || null,
+        status,
+        is_featured:$('#post-featured').checked,
+        seo_title:$('#post-seo-title').value.trim(),
+        seo_description:$('#post-seo-description').value.trim(),
+        author_id:old?.author_id || sessionUser.id,
+        published_at:status==='published' ? (old?.published_at || new Date().toISOString()) : (old?.published_at || null)
+      };
+      saveButton.disabled=true; saveButton.textContent='儲存中…'; setMessage('正在儲存文章…');
+      try {
+        let saved;
+        if (old) {
+          const {data,error}=await supabase.from('blog_posts').update(payload).eq('id',old.id).select('id').single();
+          if(error) throw error; saved=data;
+        } else {
+          const {data,error}=await supabase.from('blog_posts').insert(payload).select('id').single();
+          if(error) throw error; saved=data;
+        }
+
+        const tagNames=[...new Set($('#post-tags').value.split(/[，,、]/).map(x=>x.trim()).filter(Boolean))];
+        const selectedTagIds=[];
+        for (const [index,name] of tagNames.entries()) {
+          let tag=tags.find(t=>t.name.toLowerCase()===name.toLowerCase());
+          if (!tag) {
+            const {data,error}=await supabase.from('blog_tags').insert({name,slug:'tag-'+Date.now().toString(36)+'-'+index}).select('id,name,slug').single();
+            if(error) throw error;
+            tag=data; tags.push(tag);
+          }
+          selectedTagIds.push(tag.id);
+        }
+        const {error:deleteTagError}=await supabase.from('blog_post_tags').delete().eq('post_id',saved.id);
+        if(deleteTagError) throw deleteTagError;
+        if(selectedTagIds.length) {
+          const {error:insertTagError}=await supabase.from('blog_post_tags').insert(selectedTagIds.map(tag_id=>({post_id:saved.id,tag_id})));
+          if(insertTagError) throw insertTagError;
+        }
+        await loadData(); closeEditor();
+        $('#list-message').textContent='文章已儲存。若狀態為已發布，公開網站仍需完成前台資料串接與部署流程才會顯示。';
+      } catch(error) {
+        setMessage(error?.message || '儲存失敗，請稍後再試。',true);
+      } finally {
+        saveButton.disabled=false; saveButton.textContent='儲存文章';
+      }
+    }
+
+    async function deletePost(post) {
+      if (!confirm('確定永久刪除文章「'+post.title+'」？此操作無法復原。建議不再公開的文章改為封存。')) return;
+      $('#list-message').textContent='正在刪除…';
+      const {error}=await supabase.from('blog_posts').delete().eq('id',post.id);
+      if(error) { $('#list-message').textContent='刪除失敗：'+error.message; return; }
+      await loadData();
+      $('#list-message').textContent='文章已刪除。';
+    }
+
+    async function createCategory(event) {
+      event.preventDefault();
+      const name=$('#category-name').value.trim();
+      const slug=$('#category-slug').value.trim().toLowerCase() || slugify(name);
+      if(!name) return;
+      if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) { $('#list-message').textContent='分類網址代稱格式錯誤。'; return; }
+      const {error}=await supabase.from('blog_categories').insert({name,slug,description:'',sort_order:(categories.length+1)*10,is_active:true});
+      if(error) { $('#list-message').textContent='新增分類失敗：'+error.message; return; }
+      $('#category-form').reset(); await loadData();
+      $('#list-message').textContent='分類已新增。';
+    }
+
+    $('#new-post').addEventListener('click',()=>openEditor());
+    $('#close-editor').addEventListener('click',closeEditor);
+    $('#cancel-edit').addEventListener('click',closeEditor);
+    form.addEventListener('submit',savePost);
+    $('#admin-search').addEventListener('input',renderPosts);
+    $('#status-filter').addEventListener('change',renderPosts);
+    $('#category-form').addEventListener('submit',createCategory);
+    $('#post-title').addEventListener('input',()=>{if(!$('#post-id').value && !$('#post-slug').dataset.edited) $('#post-slug').value=slugify($('#post-title').value);});
+    $('#post-slug').addEventListener('input',()=>{$('#post-slug').dataset.edited='true';});
+    $('#post-slug').addEventListener('change',()=>{$('#post-slug').value=$('#post-slug').value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');});
+    $('#category-name').addEventListener('input',()=>{if(!$('#category-slug').dataset.edited) $('#category-slug').value=slugify($('#category-name').value);});
+    $('#category-slug').addEventListener('input',()=>{$('#category-slug').dataset.edited='true';});
+
+    try {
+      const {data:{session},error}=await supabase.auth.getSession();
+      if(error) throw error;
+      if(!session) throw new Error('登入狀態已失效，請重新登入。');
+      const {data:admin,error:adminError}=await supabase.from('blog_admins').select('user_id').eq('user_id',session.user.id).maybeSingle();
+      if(adminError || !admin) throw new Error('目前帳號沒有拾光誌管理者權限。');
+      sessionUser=session.user;
+      await loadData();
+    } catch(error) {
+      $('#list-message').textContent='無法載入文章資料：'+(error?.message || '未知錯誤');
+    }
   </script>
+
+  <style>
+    .admin-form{display:grid;gap:18px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .form-span-2{grid-column:1/-1}
+    .form-field{display:grid;gap:7px;font-size:13px;color:#566158}
+    .form-field input,.form-field textarea,.form-field select,.category-create input{width:100%;padding:12px 13px;border:1px solid var(--line);background:#fffefa;color:#26342d;font:inherit}
+    .form-field textarea{line-height:1.8;resize:vertical}
+    .form-field small{font-size:11px;color:var(--muted)}
+    .form-check{display:flex;align-items:center;gap:9px;font-size:13px}
+    .form-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .form-actions .button{margin-top:0}
+    .category-create{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin-bottom:18px}
+    .category-create .button{margin:0;white-space:nowrap}
+    .table-scroll{overflow-x:auto}
+    .danger-link{color:#a33b32}
+    [hidden]{display:none!important}
+    @media(max-width:700px){.form-grid,.category-create{grid-template-columns:1fr}.form-span-2{grid-column:auto}.section-heading{align-items:flex-start;gap:12px;flex-direction:column}}
+  </style>
 </BaseLayout>
