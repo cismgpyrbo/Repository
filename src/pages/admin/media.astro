@@ -1,0 +1,229 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="圖片管理｜拾光誌">
+  <main class="container admin-shell">
+    <div class="eyebrow">MEDIA LIBRARY</div>
+    <div class="section-heading">
+      <div><h1 class="serif">圖片管理</h1><p class="muted">管理 Supabase Storage 的 blog-media 圖片素材。僅拾光誌管理者可以瀏覽、上傳、修改中繼資料及刪除。</p></div>
+      <a class="category-chip" href="/admin/">返回管理儀表板</a>
+    </div>
+
+    <section class="admin-panel">
+      <div class="section-heading"><h2 class="serif">上傳圖片</h2><span class="muted">單檔上限 10 MiB</span></div>
+      <form id="upload-form" class="upload-form">
+        <label class="form-field form-span-2">選擇圖片（JPEG、PNG、WebP、GIF、AVIF）
+          <input id="media-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" required />
+        </label>
+        <label class="form-field">資料夾<input id="media-folder" value="uploads" maxlength="80" placeholder="例如：covers、articles" /></label>
+        <label class="form-field">替代文字（Alt Text）<input id="media-alt" maxlength="300" placeholder="描述圖片內容，供無障礙及搜尋使用" /></label>
+        <label class="form-field form-span-2">圖片說明<textarea id="media-caption" rows="2" maxlength="500" placeholder="選填"></textarea></label>
+        <div class="form-actions form-span-2"><button class="button" id="upload-button" type="submit">上傳圖片</button><span id="upload-message" class="muted" role="status" aria-live="polite"></span></div>
+      </form>
+    </section>
+
+    <section class="admin-panel">
+      <div class="section-heading"><h2 class="serif">素材庫</h2><span id="media-count" class="muted">載入中…</span></div>
+      <div class="search-row">
+        <input id="media-search" type="search" placeholder="搜尋檔名、替代文字或說明…" aria-label="搜尋圖片" />
+        <select id="folder-filter" aria-label="依資料夾篩選"><option value="">所有資料夾</option></select>
+      </div>
+      <div id="media-grid" class="media-grid"><p class="muted">正在載入圖片…</p></div>
+      <p id="list-message" class="muted" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <dialog id="edit-dialog" class="media-dialog">
+    <form id="edit-form" method="dialog">
+      <div class="section-heading"><h2 class="serif">編輯圖片資訊</h2><button class="category-chip" value="cancel" type="submit">關閉</button></div>
+      <input id="edit-id" type="hidden" />
+      <label class="form-field">檔案名稱<input id="edit-file-name" disabled /></label>
+      <label class="form-field">資料夾<input id="edit-folder" maxlength="80" required /></label>
+      <label class="form-field">替代文字<input id="edit-alt" maxlength="300" /></label>
+      <label class="form-field">圖片說明<textarea id="edit-caption" rows="3" maxlength="500"></textarea></label>
+      <div class="form-actions"><button class="button" id="save-edit" type="button">儲存修改</button><span id="edit-message" class="muted"></span></div>
+    </form>
+  </dialog>
+
+  <script is:inline type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const supabase = createClient('https://aaynitbvfhxttrmlmvlf.supabase.co', 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a', {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
+    const $ = (s) => document.querySelector(s);
+    const bucket = 'blog-media';
+    const maxBytes = 10 * 1024 * 1024;
+    const allowed = new Set(['image/jpeg','image/png','image/webp','image/gif','image/avif']);
+    let media = [];
+    let editing = null;
+
+    const safe = (value) => String(value ?? '');
+    const publicUrl = (path) => supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+    const message = (selector, value, error=false) => {
+      $(selector).textContent = value;
+      $(selector).style.color = error ? '#a33b32' : '';
+    };
+    const cleanFolder = (value) => value.trim().replace(/\\/g,'/').replace(/^\/+|\/+$/g,'').replace(/[^a-zA-Z0-9_/-]+/g,'-').replace(/\/{2,}/g,'/').slice(0,80) || 'uploads';
+    const cleanName = (value) => value.normalize('NFKD').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'').slice(-100) || 'image';
+
+    async function verifyAdmin() {
+      const {data:{session},error} = await supabase.auth.getSession();
+      if (error || !session) throw new Error('登入狀態已失效，請重新登入。');
+      const {data:admin,error:adminError} = await supabase.from('blog_admins').select('user_id').eq('user_id',session.user.id).maybeSingle();
+      if (adminError || !admin) throw new Error('目前帳號沒有拾光誌管理者權限。');
+      return session.user;
+    }
+
+    function render() {
+      const query = ($('#media-search').value || '').trim().toLowerCase();
+      const folder = $('#folder-filter').value;
+      const filtered = media.filter(item => {
+        const haystack = [item.file_name,item.alt_text,item.caption,item.folder].join(' ').toLowerCase();
+        return haystack.includes(query) && (!folder || item.folder === folder);
+      });
+      $('#media-count').textContent = '共 ' + media.length + ' 張，顯示 ' + filtered.length + ' 張';
+      const grid = $('#media-grid');
+      grid.replaceChildren();
+      if (!filtered.length) {
+        const empty = document.createElement('p'); empty.className='muted'; empty.textContent='目前沒有符合條件的圖片。'; grid.append(empty); return;
+      }
+      filtered.forEach(item => {
+        const card=document.createElement('article'); card.className='media-card';
+        const img=document.createElement('img'); img.src=publicUrl(item.storage_path); img.alt=item.alt_text || ''; img.loading='lazy';
+        const body=document.createElement('div'); body.className='media-card-body';
+        const name=document.createElement('strong'); name.textContent=item.file_name;
+        const meta=document.createElement('small'); meta.textContent=item.folder+' · '+(item.width && item.height ? item.width+' × '+item.height+' · ' : '')+formatBytes(item.file_size_bytes);
+        const alt=document.createElement('p'); alt.textContent=item.alt_text || '尚未設定替代文字'; alt.className='muted';
+        const actions=document.createElement('div'); actions.className='media-actions';
+        const edit=document.createElement('button'); edit.type='button'; edit.className='text-link'; edit.textContent='編輯資訊'; edit.addEventListener('click',()=>openEdit(item));
+        const copy=document.createElement('button'); copy.type='button'; copy.className='text-link'; copy.textContent='複製圖片網址'; copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(publicUrl(item.storage_path));message('#list-message','已複製圖片網址。');}catch{message('#list-message','無法存取剪貼簿，請直接開啟圖片預覽。',true);}});
+        const del=document.createElement('button'); del.type='button'; del.className='text-link danger-link'; del.textContent='刪除'; del.addEventListener('click',()=>deleteMedia(item));
+        actions.append(edit,copy,del); body.append(name,meta,alt,actions); card.append(img,body); grid.append(card);
+      });
+    }
+    function formatBytes(bytes) {
+      const n=Number(bytes)||0;
+      return n < 1024*1024 ? (n/1024).toFixed(1)+' KB' : (n/1024/1024).toFixed(2)+' MB';
+    }
+    async function loadMedia() {
+      message('#list-message','正在讀取素材庫…');
+      const {data,error}=await supabase.from('blog_media').select('id,storage_bucket,storage_path,file_name,mime_type,file_size_bytes,width,height,alt_text,caption,folder,status,uploaded_by,created_at,updated_at').order('created_at',{ascending:false});
+      if(error) throw error;
+      media=data || [];
+      const folders=[...new Set(media.map(x=>x.folder).filter(Boolean))].sort();
+      const select=$('#folder-filter'), previous=select.value;
+      select.replaceChildren(new Option('所有資料夾',''));
+      folders.forEach(f=>select.add(new Option(f,f)));
+      select.value=folders.includes(previous)?previous:'';
+      render();
+      message('#list-message','素材庫已同步。');
+    }
+
+    async function upload(event) {
+      event.preventDefault();
+      const file=$('#media-file').files?.[0];
+      if(!file) return;
+      if(!allowed.has(file.type)) {message('#upload-message','不支援此圖片格式。',true);return;}
+      if(file.size>maxBytes) {message('#upload-message','圖片超過 10 MiB，請先壓縮後再上傳。',true);return;}
+      const button=$('#upload-button'); button.disabled=true; button.textContent='上傳中…';
+      let uploadedPath=null;
+      try {
+        const user=await verifyAdmin();
+        let width=null,height=null;
+        try { const bitmap=await createImageBitmap(file); width=bitmap.width;height=bitmap.height;bitmap.close(); } catch {}
+        const now=new Date();
+        const folder=cleanFolder($('#media-folder').value);
+        const path=folder+'/'+now.getFullYear()+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+crypto.randomUUID()+'_'+cleanName(file.name);
+        const {error:uploadError}=await supabase.storage.from(bucket).upload(path,file,{contentType:file.type,cacheControl:'3600',upsert:false});
+        if(uploadError) throw uploadError;
+        uploadedPath=path;
+        const {error:metaError}=await supabase.from('blog_media').insert({
+          storage_bucket:bucket,storage_path:path,file_name:file.name,mime_type:file.type,file_size_bytes:file.size,
+          width,height,alt_text:$('#media-alt').value.trim(),caption:$('#media-caption').value.trim(),
+          folder,uploaded_by:user.id,status:'active'
+        });
+        if(metaError) {
+          await supabase.storage.from(bucket).remove([uploadedPath]);
+          uploadedPath=null;
+          throw metaError;
+        }
+        $('#upload-form').reset(); $('#media-folder').value=folder;
+        message('#upload-message','圖片上傳成功。');
+        await loadMedia();
+      } catch(error) {
+        message('#upload-message','上傳失敗：'+(error?.message || '未知錯誤'),true);
+      } finally {button.disabled=false;button.textContent='上傳圖片';}
+    }
+
+    function openEdit(item) {
+      editing=item;
+      $('#edit-id').value=item.id; $('#edit-file-name').value=item.file_name;
+      $('#edit-folder').value=item.folder; $('#edit-alt').value=item.alt_text;
+      $('#edit-caption').value=item.caption;
+      $('#edit-dialog').showModal();
+      message('#edit-message','');
+    }
+    async function saveEdit() {
+      if(!editing) return;
+      const button=$('#save-edit');button.disabled=true;
+      try {
+        const user=await verifyAdmin();
+        const {error}=await supabase.from('blog_media').update({
+          folder:cleanFolder($('#edit-folder').value),
+          alt_text:$('#edit-alt').value.trim(),
+          caption:$('#edit-caption').value.trim(),
+          updated_at:new Date().toISOString()
+        }).eq('id',editing.id);
+        if(error) throw error;
+        $('#edit-dialog').close();editing=null;await loadMedia();
+      } catch(error) {message('#edit-message','儲存失敗：'+(error?.message || '未知錯誤'),true);}
+      finally {button.disabled=false;}
+    }
+    async function deleteMedia(item) {
+      const {count,error:refError}=await supabase.from('blog_posts').select('id',{count:'exact',head:true}).eq('cover_image_id',item.id);
+      if(refError) {message('#list-message','無法確認圖片引用狀態，為安全起見取消刪除：'+refError.message,true);return;}
+      if(count>0) {message('#list-message','此圖片正被 '+count+' 篇文章作為封面使用，請先更換封面後再刪除。',true);return;}
+      if(!confirm('確定刪除圖片「'+item.file_name+'」？此操作無法復原。')) return;
+      message('#list-message','正在刪除圖片…');
+      const {error:storageError}=await supabase.storage.from(bucket).remove([item.storage_path]);
+      if(storageError) {message('#list-message','Storage 刪除失敗：'+storageError.message,true);return;}
+      const {error:rowError}=await supabase.from('blog_media').delete().eq('id',item.id);
+      if(rowError) {message('#list-message','圖片檔已刪除，但中繼資料刪除失敗，請聯絡管理者：'+rowError.message,true);return;}
+      await loadMedia();message('#list-message','圖片已刪除。');
+    }
+
+    $('#upload-form').addEventListener('submit',upload);
+    $('#edit-form').addEventListener('submit',e=>e.preventDefault());
+    $('#save-edit').addEventListener('click',saveEdit);
+    $('#media-search').addEventListener('input',render);
+    $('#folder-filter').addEventListener('change',render);
+    try { await verifyAdmin(); await loadMedia(); }
+    catch(error) { message('#list-message','無法載入圖片管理：'+(error?.message || '未知錯誤'),true); }
+  </script>
+
+  <style>
+    .upload-form{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .form-span-2{grid-column:1/-1}
+    .form-field{display:grid;gap:7px;font-size:13px;color:#566158}
+    .form-field input,.form-field textarea{width:100%;padding:12px 13px;border:1px solid var(--line);background:#fffefa;color:#26342d;font:inherit}
+    .form-field textarea{resize:vertical;line-height:1.7}
+    .form-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .form-actions .button{margin:0}
+    .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px}
+    .media-card{border:1px solid var(--line);background:#fffefa;min-width:0}
+    .media-card>img{display:block;width:100%;height:170px;object-fit:contain;background:#f0f0eb}
+    .media-card-body{padding:12px;display:grid;gap:7px;min-width:0}
+    .media-card-body strong{overflow-wrap:anywhere;font-size:13px}
+    .media-card-body small{color:var(--muted);font-size:11px}
+    .media-card-body p{font-size:12px;margin:0;min-height:18px}
+    .media-actions{display:flex;gap:12px;flex-wrap:wrap}
+    .media-actions button{font:inherit;font-size:12px}
+    .danger-link{color:#a33b32}
+    .media-dialog{width:min(560px,calc(100% - 28px));border:1px solid var(--line);padding:24px;background:#fffefa;color:#26342d}
+    .media-dialog::backdrop{background:#18231dcc}
+    .media-dialog form{display:grid;gap:15px}
+    .media-dialog .section-heading{align-items:center}
+    [hidden]{display:none!important}
+    @media(max-width:700px){.upload-form{grid-template-columns:1fr}.form-span-2{grid-column:auto}}
+  </style>
+</BaseLayout>
