@@ -1,13 +1,14 @@
 # 拾光誌｜個人部落格
 
-個人部落格與每日新聞中心 UI Prototype，使用 Astro 建置，部署目標為 GitHub Pages，網站完成後再轉移至 Netlify。
+個人部落格與每日新聞中心，使用 Astro 建置，部署於 GitHub Pages，後續可再轉移至 Netlify。
 
 ## 技術
+
 - Astro 5 + TypeScript
 - 響應式 CSS
-- React integration（預留互動元件）
-- GitHub Pages（目前預覽）
-- Supabase（下一階段整合，尚未連線）
+- React integration（互動元件預留）
+- GitHub Pages（目前網站）
+- Supabase Auth、Postgres、Storage（內容與管理資料）
 
 ## 本機啟動
 
@@ -17,55 +18,53 @@ npm run dev
 ```
 
 ## 網站頁面
+
 - `/`：首頁
 - `/blog/`：文章列表
 - `/blog/[slug]/`：文章詳情
-- `/news/`：每日新聞列表
-- `/news/[slug]/`：新聞整理詳情與原始來源連結
+- `/news/`：每日新聞列表（即時讀取 Supabase 已發布內容）
+- `/news/?slug=文章slug`：每日新聞摘要詳情
 - `/admin/`：管理儀表板
 - `/admin/posts/`：文章管理 UI
-- `/admin/news/`：新聞管理 UI
-- `/admin/news/import/`：貼上及解析 Meta AI 新聞
+- `/admin/news/`：新聞管理（讀取 Supabase 新聞資料）
+- `/admin/news/import/`：Meta AI 新聞格式解析原型
 
-## 每日新聞匯入格式
+## 每日新聞資料流程
 
-Meta AI 每則新聞建議使用以下固定欄位：
+每日新聞摘要由排程產生，完成來源核實與發布前檢查後，寫入 Supabase：
 
-```text
-## 新聞 1
-- 新聞標題：
-- 新聞日期：
-- 新聞分類：
-- 新聞來源：
-- 原始新聞網址：
-- 新聞摘要：
-- 詳細新聞整理：
-- 重要關鍵字：
-```
+- 專案：`aaynitbvfhxttrmlmvlf`
+- 資料表：`public.blog_news_articles`
+- 每日總覽使用 `content_type = 'daily_briefing'`
+- `status = 'published'` 的內容會顯示於公開的 `/news/` 頁面
+- 同一天使用 `YYYY-MM-DD-daily-briefing` 作為 slug，避免重複建立
+- 公開訪客僅能讀取已發布新聞；管理者權限由 Supabase Auth、`blog_admins` 與 RLS 控制
+- 每次自動發布會寫入 `blog_audit_logs`
 
-可一次貼上多則新聞。管理者應先檢查內容及來源，再決定發布。
+網站每日新聞頁面在瀏覽器端使用 Supabase publishable key 讀取資料，資料讀取權限由 RLS 限制為已發布內容。publishable key 可用於前端；禁止將 Supabase secret 或 service_role key 放入前端或 GitHub。
 
-## 目前原型限制
-- 所有新聞及文章均為示範資料。
-- 新聞匯入解析目前只在瀏覽器端示範，不會寫入資料庫。
-- 新聞發布按鈕不會真的發布或觸發部署。
-- 後台尚未接 Supabase Auth、RLS 或 Storage。
-- 正式版將以 Supabase 儲存新聞，透過受保護的發布流程觸發 GitHub Actions 重新建置。
-- 不應將新聞媒體的整篇原文直接複製發布；應使用自行整理的摘要與內容，並清楚標示來源及原文連結。
+**每日新聞內容寫入資料庫後，不需要為每篇新聞重新部署 GitHub Pages。** GitHub Pages 部署只在網站程式碼更新時執行。
 
+## 新聞來源與內容原則
 
-## Supabase 資料庫規劃
+- 新聞內容使用自行整理的摘要與分析，不複製新聞媒體整篇原文。
+- 保留來源名稱與原始新聞 HTTPS 連結。
+- 已發布內容才會公開顯示；草稿與封存內容不會出現在訪客頁面。
+- 每日新聞匯入頁目前仍是格式解析原型，尚未完成手動匯入資料庫的 CRUD 流程。
 
-本專案沿用既有 Supabase 專案，所有本專案資料庫物件統一使用 `blog_*` 前綴，與同一 Supabase 專案中的其他系統隔離。
+## Supabase 資料庫
+
+本專案沿用既有 Supabase 專案，網站資料表統一使用 `blog_*` 前綴，與同一專案中的其他系統隔離。不得在本專案功能中修改非 `blog_*` 資料表。
 
 Migration：
+
 - `supabase/migrations/202611270001_create_blog_platform.sql`
 
-預計建立：
-- `blog_admins`、`blog_posts`、`blog_categories`、`blog_tags`、`blog_post_tags`
-- `blog_news_import_batches`、`blog_news_articles`
-- `blog_site_settings`：網站公開/私有設定
-- `blog_media`：圖片中繼資料；實際圖片存放於 Supabase Storage 的 `blog-media` bucket
-- `blog_audit_logs`：管理者操作紀錄
+主要資料表：
 
-**注意：** Migration 已提交至 GitHub，但尚未在 Supabase SQL Editor 執行；網站目前也尚未連接 Supabase。執行前請先備份資料庫並確認專案參照碼。
+- `blog_admins`：管理者白名單
+- `blog_posts`、`blog_categories`、`blog_tags`、`blog_post_tags)：一般部落格文章
+- `blog_news_import_batches)、`blog_news_articles)：每日新聞與匯入批次
+- `blog_site_settings)：網站設定
+- `blog_media)：圖片中繼資料；實際圖片存放於 Supabase Storage 的 `blog-media` bucket
+- `blog_audit_logs)：管理操作紀錄
