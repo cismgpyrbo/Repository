@@ -126,7 +126,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       $('#list-message').textContent='正在載入 Supabase 資料…';
       const [categoryResult,postResult,tagResult,postTagResult] = await Promise.all([
         supabase.from('blog_categories').select('id,name,slug,is_active,sort_order').order('sort_order'),
-        supabase.from('blog_posts').select('id,title,slug,excerpt,content,category_id,status,is_featured,seo_title,seo_description,published_at,created_at,updated_at').order('updated_at',{ascending:false}),
+        supabase.from('blog_posts').select('id,title,slug,excerpt,content,category_id,status,is_featured,seo_title,seo_description,published_at,author_id,created_at,updated_at').order('updated_at',{ascending:false}),
         supabase.from('blog_tags').select('id,name,slug').order('name'),
         supabase.from('blog_post_tags').select('post_id,tag_id')
       ]);
@@ -142,6 +142,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
     function openEditor(post=null) {
       form.reset();
+      delete $('#post-slug').dataset.edited;
       $('#post-id').value=post?.id || '';
       $('#editor-heading').textContent=post ? '編輯文章' : '新增文章';
       $('#post-title').value=post?.title || '';
@@ -238,7 +239,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) { $('#list-message').textContent='分類網址代稱格式錯誤。'; return; }
       const {error}=await supabase.from('blog_categories').insert({name,slug,description:'',sort_order:(categories.length+1)*10,is_active:true});
       if(error) { $('#list-message').textContent='新增分類失敗：'+error.message; return; }
-      $('#category-form').reset(); await loadData();
+      $('#category-form').reset(); delete $('#category-slug').dataset.edited; await loadData();
       $('#list-message').textContent='分類已新增。';
     }
 
