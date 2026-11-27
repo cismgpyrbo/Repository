@@ -38,8 +38,8 @@ const { title = '拾光誌｜在日常裡拾起值得記錄的光', description 
       const supabase = createClient('https://aaynitbvfhxttrmlmvlf.supabase.co', 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a', {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
       });
-      const root = basePath.replace(/\\/$/, '');
-      const path = location.pathname.replace(/\\/$/, '') || '/';
+      const root = (basePath.endsWith('/') ? basePath.slice(0, -1) : basePath);
+      const path = (location.pathname.endsWith('/') ? location.pathname.slice(0, -1) : location.pathname) || '/';
       const loginPath = root + '/admin/login';
       const isAdminPage = path === root + '/admin' || path.startsWith(root + '/admin/');
       const isLoginPage = path === loginPath || path === loginPath + '/';
