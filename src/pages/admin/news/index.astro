@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { newsArticles } from '../../../data/news';
+---
+<BaseLayout title="新聞管理｜拾光誌">
+  <main class="container admin-shell">
+    <div class="eyebrow">NEWS MANAGEMENT</div>
+    <h1 class="serif">新聞管理</h1>
+    <p class="muted">管理每日匯入的新聞內容。此版本為 UI 原型，尚未連接資料庫。</p>
+    <div class="admin-stats">
+      <div class="stat"><span class="muted">示範新聞</span><strong>{newsArticles.length}</strong></div>
+      <div class="stat"><span class="muted">已發布</span><strong>0</strong></div>
+      <div class="stat"><span class="muted">待審核</span><strong>0</strong></div>
+    </div>
+    <div class="admin-panel">
+      <div class="section-heading"><h2 class="serif">每日新聞匯入</h2><a class="button" href="/admin/news/import/">＋ 匯入 Meta AI 新聞</a></div>
+      <p class="muted">貼上 Meta AI 每日產製內容，解析後逐則檢查，再決定是否發布。</p>
+    </div>
+    <div class="admin-panel">
+      <h2 class="serif">新聞列表</h2>
+      <table class="admin-table"><thead><tr><th>標題</th><th>分類</th><th>來源</th><th>狀態</th></tr></thead><tbody>
+        {newsArticles.map((item) => <tr><td>{item.title}</td><td>{item.category}</td><td>{item.sourceName}</td><td><span class="status">示範資料</span></td></tr>)}
+      </tbody></table>
+    </div>
+  </main>
+</BaseLayout>
