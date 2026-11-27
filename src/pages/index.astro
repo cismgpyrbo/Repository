@@ -69,7 +69,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       posts.filter(p=>p.id!==featured?.id).slice(0,3).forEach(p=>latest.append(card(p,cats.get(p.category_id)?.name||'未分類',cover(p))));
       if(!latest.children.length){const p=document.createElement('p');p.className='muted';p.textContent='目前尚無其他已發布文章。';latest.append(p);}
       const categoryBox=$('#home-categories');categoryBox.replaceChildren();
-      (cr.data||[]).forEach(c=>{const a=document.createElement('a');a.className='category-chip';a.href='/category/'+encodeURIComponent(c.slug)+'/';a.textContent=c.name+'　↗';categoryBox.append(a);});
+      (cr.data||[]).forEach(c=>{const a=document.createElement('a');a.className='category-chip';a.href='/blog/category/?slug='+encodeURIComponent(c.slug);a.textContent=c.name+'　↗';categoryBox.append(a);});
     }catch(e){$('#home-featured').textContent='文章載入失敗，請稍後再試。';$('#home-latest').textContent='暫時無法載入文章。';$('#home-categories').textContent='暫時無法載入分類。';console.error('Public blog loading failed',e);}
   </script>
 </BaseLayout>
