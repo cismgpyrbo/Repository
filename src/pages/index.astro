@@ -1,9 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import PostCard from '../components/PostCard.astro';
-import { posts, categories } from '../data/posts';
-const featured = posts.find((p) => p.featured) ?? posts[0];
-const latest = posts.filter((p) => p.slug !== featured.slug);
+
 ---
 <BaseLayout>
   <main class="container">
@@ -13,20 +10,66 @@ const latest = posts.filter((p) => p.slug !== featured.slug);
     </section>
     <section class="section">
       <div class="section-heading"><div><div class="eyebrow">EDITOR'S PICK</div><h2>本期選讀</h2></div><a class="text-link" href="/blog/">探索全部文章 →</a></div>
-      <article class="featured">
-        <a href={`/blog/${featured.slug}/`}><img src={featured.cover} alt="" /></a>
-        <div class="featured-copy"><div class="eyebrow">{featured.category}</div><h3><a href={`/blog/${featured.slug}/`}>{featured.title}</a></h3><div class="meta"><span>{featured.date}</span><span>{featured.readTime}</span></div><p class="excerpt">{featured.excerpt}</p><a class="text-link" href={`/blog/${featured.slug}/`}>閱讀文章 →</a></div>
-      </article>
+      <article class="featured" id="home-featured"><p class="muted">正在載入已發布文章…</p></article>
     </section>
     <section class="section">
       <div class="section-heading"><div><div class="eyebrow">RECENT STORIES</div><h2>最近更新</h2></div><a class="text-link" href="/blog/">所有文章 →</a></div>
-      <div class="post-grid">{latest.slice(0,3).map((post) => <PostCard post={post} />)}</div>
+      <div class="post-grid" id="home-latest"><p class="muted">正在載入文章…</p></div>
     </section>
     <section class="section">
       <div class="section-heading"><div><div class="eyebrow">DAILY NEWS DESK</div><h2>每日新聞</h2></div><a class="text-link" href="/news/">前往新聞中心 →</a></div>
       <p class="excerpt">每日整理值得關注的消息，提供新聞摘要、完整整理與原始來源連結。</p>
       <a class="button" href="/news/">閱讀每日新聞</a>
     </section>
-    <section class="section"><div class="section-heading"><div><div class="eyebrow">EXPLORE TOPICS</div><h2>依主題閱讀</h2></div></div><div class="category-list">{categories.map((category) => <a class="category-chip" href={`/category/${encodeURIComponent(category)}/`}>{category}　↗</a>)}</div></section>
+    <section class="section"><div class="section-heading"><div><div class="eyebrow">EXPLORE TOPICS</div><h2>依主題閱讀</h2></div></div><div class="category-list" id="home-categories"><p class="muted">正在載入分類…</p></div></section>
   </main>
+<script is:inline type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
+    const $=s=>document.querySelector(s);
+    const esc=s=>String(s??'');
+    const imageUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1200&q=80';
+    const articleUrl=slug=>'/blog/article/?slug='+encodeURIComponent(slug);
+    const date=v=>v?new Date(v).toLocaleDateString('zh-TW'):'';
+    function card(p,category,cover){
+      const article=document.createElement('article');article.className='post-card';
+      const a=document.createElement('a');a.href=articleUrl(p.slug);
+      const img=document.createElement('img');img.src=cover;img.alt=p.title;img.loading='lazy';a.append(img);
+      const eyebrow=document.createElement('div');eyebrow.className='eyebrow';eyebrow.style.marginTop='16px';eyebrow.textContent=category;
+      const h=document.createElement('h3');const link=document.createElement('a');link.href=articleUrl(p.slug);link.textContent=p.title;h.append(link);
+      const meta=document.createElement('div');meta.className='meta';const d=document.createElement('span');d.textContent=date(p.published_at);meta.append(d);
+      const excerpt=document.createElement('p');excerpt.className='excerpt';excerpt.textContent=p.excerpt;
+      article.append(a,eyebrow,h,meta,excerpt);return article;
+    }
+    try{
+      const [pr,cr,mr]=await Promise.all([
+        db.from('blog_posts').select('id,title,slug,excerpt,category_id,cover_image_id,is_featured,published_at,created_at').eq('status','published').not('published_at','is',null).order('published_at',{ascending:false}).limit(12),
+        db.from('blog_categories').select('id,name,slug').eq('is_active',true).order('sort_order'),
+        db.from('blog_media').select('id,storage_path').eq('status','active')
+      ]);
+      if(pr.error)throw pr.error;if(cr.error)throw cr.error;if(mr.error)throw mr.error;
+      const cats=new Map((cr.data||[]).map(c=>[c.id,c]));
+      const media=new Map((mr.data||[]).map(m=>[m.id,imageUrl(m.storage_path)]));
+      const posts=pr.data||[];
+      const cover=p=>media.get(p.cover_image_id)||imageUrl(null);
+      const featured=posts.find(p=>p.is_featured)||posts[0];
+      const featureBox=$('#home-featured');featureBox.replaceChildren();
+      if(featured){
+        const a=document.createElement('a');a.href=articleUrl(featured.slug);
+        const img=document.createElement('img');img.src=cover(featured);img.alt=featured.title;a.append(img);
+        const copy=document.createElement('div');copy.className='featured-copy';
+        const ey=document.createElement('div');ey.className='eyebrow';ey.textContent=cats.get(featured.category_id)?.name||'未分類';
+        const h=document.createElement('h3');const l=document.createElement('a');l.href=articleUrl(featured.slug);l.textContent=featured.title;h.append(l);
+        const meta=document.createElement('div');meta.className='meta';const d=document.createElement('span');d.textContent=date(featured.published_at);meta.append(d);
+        const ex=document.createElement('p');ex.className='excerpt';ex.textContent=featured.excerpt;
+        const read=document.createElement('a');read.className='text-link';read.href=articleUrl(featured.slug);read.textContent='閱讀文章 →';
+        copy.append(ey,h,meta,ex,read);featureBox.append(a,copy);
+      }else featureBox.textContent='目前尚無已發布的精選文章。';
+      const latest=$('#home-latest');latest.replaceChildren();
+      posts.filter(p=>p.id!==featured?.id).slice(0,3).forEach(p=>latest.append(card(p,cats.get(p.category_id)?.name||'未分類',cover(p))));
+      if(!latest.children.length){const p=document.createElement('p');p.className='muted';p.textContent='目前尚無其他已發布文章。';latest.append(p);}
+      const categoryBox=$('#home-categories');categoryBox.replaceChildren();
+      (cr.data||[]).forEach(c=>{const a=document.createElement('a');a.className='category-chip';a.href='/category/'+encodeURIComponent(c.slug)+'/';a.textContent=c.name+'　↗';categoryBox.append(a);});
+    }catch(e){$('#home-featured').textContent='文章載入失敗，請稍後再試。';$('#home-latest').textContent='暫時無法載入文章。';$('#home-categories').textContent='暫時無法載入分類。';console.error('Public blog loading failed',e);}
+  </script>
 </BaseLayout>
