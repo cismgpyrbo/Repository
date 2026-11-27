@@ -19,13 +19,15 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
   </main>
   <script is:inline type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    import { marked } from 'https://esm.sh/marked@15.0.7';
+    import DOMPurify from 'https://esm.sh/dompurify@3.2.6';
     const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
     const $=s=>document.querySelector(s);
     const slug=new URLSearchParams(location.search).get('slug');
     const imgUrl=path=>'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/');
     function paragraphText(value){
-      const body=$('#article-body');body.replaceChildren();
-      String(value||'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+      const body=$('#article-body');
+      body.innerHTML=DOMPurify.sanitize(marked.parse(String(value||'')));
     }
     try{
       if(!slug)throw new Error('缺少文章網址代稱。');
@@ -53,4 +55,12 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
       $('#article-status').hidden=true;$('#article-content').hidden=false;
     }catch(e){$('#article-status').textContent=e.message||'文章載入失敗。';console.error(e);}
   </script>
+  <style>    .article-body{line-height:1.9}
+    .article-body img{max-width:100%;height:auto;border-radius:6px}
+    .article-body table{width:100%;border-collapse:collapse;margin:22px 0;display:block;overflow-x:auto}
+    .article-body th,.article-body td{border:1px solid var(--line);padding:10px 12px;text-align:left;min-width:90px}
+    .article-body th{background:#f1f2ec}
+    .article-body blockquote{border-left:3px solid var(--line);padding-left:16px;color:var(--muted)}
+    .article-body pre{overflow-x:auto;padding:14px;background:#f2f2ec;border-radius:5px}
+</style>
 </BaseLayout>
