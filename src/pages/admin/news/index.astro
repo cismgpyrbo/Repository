@@ -7,19 +7,30 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
   <main class="container admin-shell">
     <div class="eyebrow">NEWS MANAGEMENT</div>
     <h1 class="serif">新聞管理</h1>
-    <p class="muted">管理每日新聞摘要與新聞文章。每日摘要由排程產生後寫入 Supabase，發布內容會同步顯示於公開網站。</p>
+    <p class="muted">管理每日新聞摘要與新聞文章。手動匯入內容會先存為草稿，確認內容及來源後，再由管理者發布。</p>
     <div class="admin-stats">
       <div class="stat"><span class="muted">全部新聞</span><strong id="stat-total">—</strong></div>
       <div class="stat"><span class="muted">已發布</span><strong id="stat-published">—</strong></div>
-      <div class="stat"><span class="muted">待審核／草稿</span><strong id="stat-draft">—</strong></div>
+      <div class="stat"><span class="muted">草稿／封存</span><strong id="stat-draft">—</strong></div>
+      <div class="stat"><span class="muted">匯入批次</span><strong id="stat-batches">—</strong></div>
     </div>
     <div class="admin-panel">
       <div class="section-heading"><h2 class="serif">每日新聞</h2><a class="button" href="/admin/news/import/">＋ 匯入新聞</a></div>
       <p id="admin-news-status" class="muted">正在讀取 Supabase 新聞資料…</p>
       <div style="overflow-x:auto">
         <table class="admin-table">
-          <thead><tr><th>標題</th><th>日期</th><th>分類</th><th>類型</th><th>狀態</th><th>公開頁面</th></tr></thead>
+          <thead><tr><th>標題</th><th>日期</th><th>分類</th><th>類型</th><th>狀態</th><th>公開頁面</th><th>管理操作</th></tr></thead>
           <tbody id="admin-news-rows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="admin-panel">
+      <h2 class="serif">最近匯入批次</h2>
+      <p id="batch-status" class="muted">正在讀取匯入紀錄…</p>
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead><tr><th>批次日期</th><th>總數</th><th>新增</th><th>重複</th><th>未匯入</th><th>狀態</th><th>建立時間</th></tr></thead>
+          <tbody id="admin-batch-rows"></tbody>
         </table>
       </div>
     </div>
@@ -32,59 +43,140 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
   const base = basePath.endsWith('/') ? basePath : basePath + '/';
   const rows = document.getElementById('admin-news-rows');
   const status = document.getElementById('admin-news-status');
+  const batchRows = document.getElementById('admin-batch-rows');
+  const batchStatus = document.getElementById('batch-status');
 
   const cell = (value) => {
     const td = document.createElement('td');
     td.textContent = value ?? '';
     return td;
   };
+  const actionButton = (label, handler) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'category-chip';
+    button.textContent = label;
+    button.addEventListener('click', handler);
+    return button;
+  };
 
-  try {
+  async function loadNews() {
     const { data, error } = await supabase
       .from('blog_news_articles')
-      .select('title,slug,news_date,category,status,content_type,published_at')
+      .select('id,title,slug,news_date,category,status,content_type,published_at,created_at')
       .order('news_date', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
-
     const articles = data ?? [];
     document.getElementById('stat-total').textContent = String(articles.length);
     document.getElementById('stat-published').textContent = String(articles.filter((item) => item.status === 'published').length);
-    document.getElementById('stat-draft').textContent = String(articles.filter((item) => item.status === 'draft').length);
+    document.getElementById('stat-draft').textContent = String(articles.filter((item) => item.status !== 'published').length);
     status.textContent = '已連線 Supabase，共讀取 ' + articles.length + ' 筆新聞。';
 
     rows.replaceChildren();
     if (!articles.length) {
       const tr = document.createElement('tr');
-      const td = cell('目前尚無新聞資料；每日摘要發布後會出現在此列表。');
-      td.colSpan = 6;
+      const td = cell('目前尚無新聞資料；請使用「匯入新聞」建立草稿。');
+      td.colSpan = 7;
       tr.append(td);
       rows.append(tr);
-    } else {
-      articles.forEach((item) => {
-        const tr = document.createElement('tr');
-        tr.append(
-          cell(item.title),
-          cell(item.news_date),
-          cell(item.category),
-          cell(item.content_type === 'daily_briefing' ? '每日摘要' : '單則新聞'),
-          cell(item.status === 'published' ? '已發布' : item.status === 'draft' ? '草稿' : '已封存')
-        );
-        const td = document.createElement('td');
-        if (item.status === 'published') {
-          const a = document.createElement('a');
-          a.className = 'text-link';
-          a.href = base + 'news/?slug=' + encodeURIComponent(item.slug);
-          a.textContent = '查看';
-          td.append(a);
-        } else {
-          td.textContent = '尚未公開';
-        }
-        tr.append(td);
-        rows.append(tr);
-      });
+      return;
     }
+    articles.forEach((item) => {
+      const tr = document.createElement('tr');
+      tr.append(
+        cell(item.title),
+        cell(item.news_date),
+        cell(item.category),
+        cell(item.content_type === 'daily_briefing' ? '每日摘要' : '單則新聞'),
+        cell(item.status === 'published' ? '已發布' : item.status === 'draft' ? '草稿' : '已封存')
+      );
+      const publicCell = document.createElement('td');
+      if (item.status === 'published') {
+        const a = document.createElement('a');
+        a.className = 'text-link';
+        a.href = base + 'news/?slug=' + encodeURIComponent(item.slug);
+        a.textContent = '查看';
+        publicCell.append(a);
+      } else publicCell.textContent = '尚未公開';
+      tr.append(publicCell);
+
+      const operation = document.createElement('td');
+      if (item.status === 'published') {
+        operation.append(actionButton('撤回為草稿', () => changeStatus(item, 'draft')));
+      } else if (item.status === 'draft') {
+        operation.append(actionButton('確認發布', () => changeStatus(item, 'published')));
+      } else {
+        operation.append(actionButton('重新開放為草稿', () => changeStatus(item, 'draft')));
+      }
+      tr.append(operation);
+      rows.append(tr);
+    });
+  }
+
+  async function changeStatus(item, nextStatus) {
+    const verb = nextStatus === 'published' ? '發布' : '改回草稿';
+    if (!confirm('確定將「' + item.title + '」' + verb + '？')) return;
+    status.textContent = '正在更新新聞狀態…';
+    const payload = nextStatus === 'published'
+      ? { status: 'published', published_at: new Date().toISOString() }
+      : { status: 'draft', published_at: null };
+    const { data, error } = await supabase.from('blog_news_articles')
+      .update(payload).eq('id', item.id).select('id').maybeSingle();
+    if (error) {
+      status.textContent = '更新失敗：' + error.message;
+      return;
+    }
+    if (!data) {
+      status.textContent = '更新未完成：資料未變更，請重新登入或確認管理者權限。';
+      return;
+    }
+    await loadNews();
+  }
+
+  async function loadBatches() {
+    const { data, error } = await supabase.from('blog_news_import_batches')
+      .select('id,batch_date,total_count,accepted_count,duplicate_count,rejected_count,status,created_at')
+      .order('created_at', { ascending: false }).limit(20);
+    if (error) throw error;
+    const batches = data ?? [];
+    document.getElementById('stat-batches').textContent = String(batches.length);
+    batchStatus.textContent = '最近 ' + batches.length + ' 個匯入批次。';
+    batchRows.replaceChildren();
+    if (!batches.length) {
+      const tr = document.createElement('tr');
+      const td = cell('尚無手動匯入紀錄。');
+      td.colSpan = 7;
+      tr.append(td);
+      batchRows.append(tr);
+      return;
+    }
+    batches.forEach((batch) => {
+      const tr = document.createElement('tr');
+      const created = batch.created_at ? new Date(batch.created_at).toLocaleString('zh-TW') : '';
+      tr.append(
+        cell(batch.batch_date),
+        cell(batch.total_count),
+        cell(batch.accepted_count),
+        cell(batch.duplicate_count),
+        cell(batch.rejected_count),
+        cell(batch.status),
+        cell(created)
+      );
+      batchRows.append(tr);
+    });
+  }
+
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) throw new Error('登入狀態已失效，請重新登入。');
+    const { data: adminRow, error: adminError } = await supabase.from('blog_admins')
+      .select('user_id').eq('user_id', userData.user.id).maybeSingle();
+    if (adminError) throw adminError;
+    if (!adminRow) throw new Error('目前帳號不在網站管理者名單內。');
+    await Promise.all([loadNews(), loadBatches()]);
   } catch (error) {
     status.textContent = '新聞資料載入失敗：' + (error?.message || '未知錯誤');
+    batchStatus.textContent = '匯入批次載入失敗：' + (error?.message || '未知錯誤');
   }
 </script>
