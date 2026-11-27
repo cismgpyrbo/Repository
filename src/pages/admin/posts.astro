@@ -19,7 +19,15 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <label class="form-field">文章分類<select id="post-category"><option value="">未分類</option></select></label>
           <label class="form-field form-span-2">封面圖片<select id="post-cover-image"><option value="">不設定封面圖片</option></select><small><a href="/admin/media/" target="_blank" rel="noopener">前往圖片管理</a> 上傳或整理圖片素材。</small><img id="post-cover-preview" alt="封面圖片預覽" hidden style="display:block;max-width:320px;max-height:220px;object-fit:contain;border:1px solid var(--line);padding:6px;background:#fff" /><small id="cover-preview-message" role="status">選取圖片後會顯示預覽。</small></label>
           <label class="form-field form-span-2">文章摘要<textarea id="post-excerpt" rows="2" maxlength="500" placeholder="顯示於文章列表的摘要"></textarea></label>
-          <label class="form-field form-span-2">文章內容<textarea id="post-content" rows="12" placeholder="每段文字以空白行分隔。可先輸入純文字；Markdown 前台呈現會在後續整合。"></textarea></label>
+          <div class="form-field form-span-2 content-editor-field">
+            <span>文章內容</span>
+            <div class="editor-toolbar" role="toolbar" aria-label="文章內容編輯工具">
+              <button type="button" data-insert="heading">標題</button><button type="button" data-insert="bold"><strong>粗體</strong></button><button type="button" data-insert="italic"><em>斜體</em></button><button type="button" data-insert="link">插入連結</button><button type="button" id="insert-table">插入表格</button><button type="button" id="insert-media">插入媒體</button><button type="button" id="toggle-preview" aria-pressed="false">預覽文章</button>
+            </div>
+            <textarea id="post-content" rows="16" placeholder="撰寫文章內容。可使用工具列插入表格、媒體，也支援 Markdown 格式。"></textarea>
+            <div class="editor-help">支援標題、粗體、斜體、連結、清單、表格及圖片。編輯內容會以 Markdown 儲存。</div>
+            <section id="content-preview-panel" class="content-preview-panel" hidden><div class="preview-label">文章預覽</div><div id="content-preview" class="article-body"></div></section>
+          </div>
           <label class="form-field">文章狀態<select id="post-status"><option value="draft">草稿</option><option value="published">已發布</option><option value="archived">已封存</option></select></label>
           <label class="form-field">文章標籤<input id="post-tags" placeholder="生活、閱讀、創作（以逗號分隔）" /></label>
           <label class="form-field form-span-2">SEO 標題<input id="post-seo-title" maxlength="200" placeholder="留白時使用文章標題" /></label>
@@ -51,8 +59,17 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     </section>
   </main>
 
+  <dialog id="media-picker-dialog" class="media-picker-dialog">
+    <div class="media-picker-head"><div><h2>插入媒體</h2><p>選擇媒體庫中的圖片插入文章內容。</p></div><button type="button" id="close-media-picker" class="category-chip">關閉</button></div>
+    <input id="media-picker-search" type="search" placeholder="搜尋圖片檔名或替代文字" aria-label="搜尋媒體" />
+    <div id="media-picker-grid" class="media-picker-grid"></div>
+    <p id="media-picker-message" class="muted"></p>
+  </dialog>
+
   <script is:inline type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    import { marked } from 'https://esm.sh/marked@15.0.7';
+    import DOMPurify from 'https://esm.sh/dompurify@3.2.6';
     const supabase = createClient('https://aaynitbvfhxttrmlmvlf.supabase.co', 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a', {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
@@ -68,6 +85,37 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     let tags = [];
     let postTags = [];
     let mediaItems = [];
+    let previewVisible = false;
+    const contentEditor = $('#post-content');
+    const imageUrl = path => 'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/');
+    function insertAtCursor(text) {
+      const start=contentEditor.selectionStart,end=contentEditor.selectionEnd,value=contentEditor.value;
+      contentEditor.value=value.slice(0,start)+text+value.slice(end);
+      contentEditor.focus();contentEditor.selectionStart=contentEditor.selectionEnd=start+text.length;
+      updateContentPreview();
+    }
+    function updateContentPreview() {
+      if(!previewVisible)return;
+      $('#content-preview').innerHTML=DOMPurify.sanitize(marked.parse(contentEditor.value||''));
+    }
+    function renderMediaPicker() {
+      const q=$('#media-picker-search').value.trim().toLowerCase(),grid=$('#media-picker-grid');
+      grid.replaceChildren();
+      const items=mediaItems.filter(x=>(x.file_name+' '+(x.alt_text||'')).toLowerCase().includes(q));
+      if(!items.length){$('#media-picker-message').textContent='沒有符合條件的圖片。';return;}
+      $('#media-picker-message').textContent='選擇圖片即可插入游標位置。';
+      items.forEach(item=>{
+        const button=document.createElement('button');button.type='button';button.className='media-picker-item';
+        const img=document.createElement('img');img.src=imageUrl(item.storage_path);img.alt=item.alt_text||item.file_name;img.loading='lazy';
+        const name=document.createElement('span');name.textContent=item.file_name;
+        button.append(img,name);button.addEventListener('click',()=>{
+          const alt=(item.alt_text||item.file_name).replace(/[\\[\\]]/g,'');
+          insertAtCursor('\\n\\n!['+alt+']('+imageUrl(item.storage_path)+')\\n\\n');
+          $('#media-picker-dialog').close();
+        });
+        grid.append(button);
+      });
+    }
 
     const slugify = (value) => {
       const slug = value.toLowerCase().normalize('NFKD')
@@ -181,6 +229,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const names = post ? postTags.filter(x=>x.post_id===post.id).map(x=>tags.find(t=>t.id===x.tag_id)?.name).filter(Boolean) : [];
       $('#post-tags').value=names.join('、');
       setMessage('');
+      previewVisible=false;$('#content-preview-panel').hidden=true;$('#toggle-preview').textContent='預覽文章';$('#toggle-preview').setAttribute('aria-pressed','false');
       editor.hidden=false;
       editor.scrollIntoView({behavior:'smooth',block:'start'});
       $('#post-title').focus();
@@ -269,6 +318,30 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     }
 
     $('#new-post').addEventListener('click',()=>openEditor());
+    document.querySelectorAll('[data-insert]').forEach(button=>button.addEventListener('click',()=>{
+      const kind=button.dataset.insert;
+      if(kind==='heading')insertAtCursor('\\n\\n## 小標題\\n');
+      if(kind==='bold')insertAtCursor('**粗體文字**');
+      if(kind==='italic')insertAtCursor('*斜體文字*');
+      if(kind==='link')insertAtCursor('[連結文字](https://)');
+    }));
+    $('#insert-table').addEventListener('click',()=>{
+      const rows=Math.max(1,Math.min(10,Number(prompt('表格要幾列資料？（不含標題列，1–10）','3'))||3));
+      const cols=Math.max(1,Math.min(8,Number(prompt('表格要幾個欄位？（1–8）','3'))||3));
+      const header='| '+Array.from({length:cols},(_,i)=>'欄位 '+(i+1)).join(' | ')+' |';
+      const divider='| '+Array(cols).fill('---').join(' | ')+' |';
+      const body=Array.from({length:rows},()=> '| '+Array(cols).fill('內容').join(' | ')+' |').join('\\n');
+      insertAtCursor('\\n\\n'+[header,divider,body].join('\\n')+'\\n\\n');
+    });
+    $('#insert-media').addEventListener('click',()=>{renderMediaPicker();$('#media-picker-dialog').showModal();});
+    $('#close-media-picker').addEventListener('click',()=>$('#media-picker-dialog').close());
+    $('#media-picker-search').addEventListener('input',renderMediaPicker);
+    $('#toggle-preview').addEventListener('click',()=>{
+      previewVisible=!previewVisible;$('#content-preview-panel').hidden=!previewVisible;
+      $('#toggle-preview').textContent=previewVisible?'關閉預覽':'預覽文章';
+      $('#toggle-preview').setAttribute('aria-pressed',String(previewVisible));updateContentPreview();
+    });
+    contentEditor.addEventListener('input',updateContentPreview);
     $('#close-editor').addEventListener('click',closeEditor);
     $('#cancel-edit').addEventListener('click',closeEditor);
     form.addEventListener('submit',savePost);
@@ -302,6 +375,26 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     .form-field{display:grid;gap:7px;font-size:13px;color:#566158}
     .form-field input,.form-field textarea,.form-field select,.category-create input{width:100%;padding:12px 13px;border:1px solid var(--line);background:#fffefa;color:#26342d;font:inherit}
     .form-field textarea{line-height:1.8;resize:vertical}
+    .editor-toolbar{display:flex;flex-wrap:wrap;gap:7px;padding:9px;background:#f2f2ec;border:1px solid var(--line);border-bottom:0}
+    .editor-toolbar button{border:1px solid #d8d9cf;background:#fffefa;color:#34433a;border-radius:4px;padding:7px 10px;font:inherit;font-size:12px;cursor:pointer}
+    .editor-toolbar button:hover{background:#e8eee7}
+    #post-content{border-radius:0 0 5px 5px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px}
+    .editor-help{font-size:11px;color:var(--muted)}
+    .content-preview-panel{border:1px solid var(--line);padding:18px;background:#fffefa}
+    .preview-label{font-size:11px;letter-spacing:.12em;color:var(--muted);margin-bottom:15px}
+    .content-preview-panel .article-body{line-height:1.9;overflow-wrap:anywhere}
+    .content-preview-panel .article-body img{max-width:100%;height:auto}
+    .content-preview-panel .article-body table{width:100%;border-collapse:collapse;margin:18px 0}
+    .content-preview-panel .article-body th,.content-preview-panel .article-body td{border:1px solid var(--line);padding:8px;text-align:left}
+    .media-picker-dialog{width:min(760px,calc(100% - 24px));max-height:85vh;border:1px solid var(--line);padding:18px;background:#fffefa;color:#26342d}
+    .media-picker-dialog::backdrop{background:#18231dcc}
+    .media-picker-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    .media-picker-head h2{margin:0}.media-picker-head p{font-size:12px;color:var(--muted);margin:5px 0 14px}
+    #media-picker-search{width:100%;padding:10px;border:1px solid var(--line);margin-bottom:12px}
+    .media-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;max-height:48vh;overflow:auto}
+    .media-picker-item{min-width:0;border:1px solid var(--line);padding:6px;background:#fff;text-align:left;cursor:pointer}
+    .media-picker-item img{display:block;width:100%;height:90px;object-fit:contain;background:#f0f0eb}
+    .media-picker-item span{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:5px}
     .form-field small{font-size:11px;color:var(--muted)}
     .form-check{display:flex;align-items:center;gap:9px;font-size:13px}
     .form-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
