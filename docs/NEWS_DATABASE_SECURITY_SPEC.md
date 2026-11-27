@@ -6,7 +6,7 @@ This schema coexists with other applications in the same Supabase project. It cr
 ## Tables
 | Table | Purpose |
 |---|---|
-| `blog_admins` | Site administrator allowlist and role |
+| `blog_admins` | Site administrator allowlist |
 | `blog_posts` | Blog articles, drafts and published posts |
 | `blog_categories` | Post categories |
 | `blog_tags` | Tags |
