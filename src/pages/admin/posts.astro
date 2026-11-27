@@ -17,7 +17,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <label class="form-field form-span-2">文章標題<input id="post-title" required maxlength="200" placeholder="輸入文章標題" /></label>
           <label class="form-field">網址代稱（Slug）<input id="post-slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="my-first-post" /><small>僅使用小寫英文字母、數字與連字號。</small></label>
           <label class="form-field">文章分類<select id="post-category"><option value="">未分類</option></select></label>
-          <label class="form-field form-span-2">文章摘要<textarea id="post-excerpt" rows="2" maxlength="500" placeholder="顯示於文章列表的摘要"></textarea></label>
+          <label class="form-field form-span-2">封面圖片<select id="post-cover-image"><option value="">不設定封面圖片</option></select><small><a href="/admin/media/" target="_blank" rel="noopener">前往圖片管理</a> 上傳或整理圖片素材。</small><img id="post-cover-preview" alt="封面圖片預覽" hidden style="max-width:220px;max-height:140px;object-fit:contain;border:1px solid var(--line);padding:4px" /></label>\n          <label class="form-field form-span-2">文章摘要<textarea id="post-excerpt" rows="2" maxlength="500" placeholder="顯示於文章列表的摘要"></textarea></label>
           <label class="form-field form-span-2">文章內容<textarea id="post-content" rows="12" placeholder="每段文字以空白行分隔。可先輸入純文字；Markdown 前台呈現會在後續整合。"></textarea></label>
           <label class="form-field">文章狀態<select id="post-status"><option value="draft">草稿</option><option value="published">已發布</option><option value="archived">已封存</option></select></label>
           <label class="form-field">文章標籤<input id="post-tags" placeholder="生活、閱讀、創作（以逗號分隔）" /></label>
@@ -65,7 +65,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     let posts = [];
     let categories = [];
     let tags = [];
-    let postTags = [];
+    let postTags = [];\n    let mediaItems = [];
 
     const slugify = (value) => {
       const slug = value.toLowerCase().normalize('NFKD')
@@ -95,7 +95,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       });
     }
 
-    function renderPosts() {
+    function renderCoverOptions(selectedId='') {\n      const select=$('#post-cover-image');\n      select.replaceChildren(new Option('不設定封面圖片',''));\n      mediaItems.forEach(item=>select.add(new Option(item.file_name+' — '+(item.alt_text || '未設定替代文字'),item.id)));\n      select.value=selectedId || '';\n      updateCoverPreview();\n    }\n    function updateCoverPreview() {\n      const item=mediaItems.find(x=>x.id===$('#post-cover-image').value);\n      const preview=$('#post-cover-preview');\n      if(!item){preview.hidden=true;preview.removeAttribute('src');return;}\n      preview.src='https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+item.storage_path.split('/').map(encodeURIComponent).join('/');\n      preview.alt=item.alt_text || '';preview.hidden=false;\n    }\n\n    function renderPosts() {
       const query = ($('#admin-search').value || '').trim().toLowerCase();
       const status = $('#status-filter').value;
       const rows = $('#admin-rows');
@@ -124,13 +124,13 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
     async function loadData() {
       $('#list-message').textContent='正在載入 Supabase 資料…';
-      const [categoryResult,postResult,tagResult,postTagResult] = await Promise.all([
+      const [categoryResult,postResult,tagResult,postTagResult,mediaResult] = await Promise.all([
         supabase.from('blog_categories').select('id,name,slug,is_active,sort_order').order('sort_order'),
-        supabase.from('blog_posts').select('id,title,slug,excerpt,content,category_id,status,is_featured,seo_title,seo_description,published_at,author_id,created_at,updated_at').order('updated_at',{ascending:false}),
+        supabase.from('blog_posts').select('id,title,slug,excerpt,content,category_id,cover_image_id,status,is_featured,seo_title,seo_description,published_at,author_id,created_at,updated_at').order('updated_at',{ascending:false}),
         supabase.from('blog_tags').select('id,name,slug').order('name'),
         supabase.from('blog_post_tags').select('post_id,tag_id')
       ]);
-      const firstError = categoryResult.error || postResult.error || tagResult.error || postTagResult.error;
+      const firstError = categoryResult.error || postResult.error || tagResult.error || postTagResult.error || mediaResult.error;
       if (firstError) throw firstError;
       categories=categoryResult.data || [];
       posts=postResult.data || [];
@@ -149,7 +149,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       $('#post-slug').value=post?.slug || '';
       $('#post-excerpt').value=post?.excerpt || '';
       $('#post-content').value=post?.content || '';
-      $('#post-category').value=post?.category_id || '';
+      $('#post-category').value=post?.category_id || '';\n      renderCoverOptions(post?.cover_image_id || '');
       $('#post-status').value=post?.status || 'draft';
       $('#post-featured').checked=!!post?.is_featured;
       $('#post-seo-title').value=post?.seo_title || '';
@@ -177,7 +177,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         title,slug,
         excerpt:$('#post-excerpt').value.trim(),
         content:$('#post-content').value,
-        category_id:$('#post-category').value || null,
+        category_id:$('#post-category').value || null,\n        cover_image_id:$('#post-cover-image').value || null,
         status,
         is_featured:$('#post-featured').checked,
         seo_title:$('#post-seo-title').value.trim(),
