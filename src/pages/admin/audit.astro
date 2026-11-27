@@ -1,0 +1,40 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="操作紀錄｜拾光誌">
+  <main class="container admin-shell">
+    <div class="eyebrow">AUDIT TRAIL</div>
+    <div class="section-heading"><div><h1 class="serif">操作紀錄</h1><p class="muted">資料庫自動記錄文章、圖片、新聞及分類標籤的管理異動。歷史紀錄不可由管理介面修改或刪除。</p></div><a class="category-chip" href="/admin/">返回管理儀表板</a></div>
+    <section class="admin-stats"><div class="stat"><span class="muted">紀錄總數</span><strong id="audit-total">—</strong></div><div class="stat"><span class="muted">本頁顯示</span><strong id="audit-shown">—</strong></div><div class="stat"><span class="muted">最近紀錄</span><strong id="audit-latest">—</strong></div></section>
+    <section class="admin-panel">
+      <div class="section-heading"><h2 class="serif">紀錄查詢</h2><button type="button" class="category-chip" id="refresh-audit">重新整理</button></div>
+      <div class="filters"><input id="audit-search" type="search" placeholder="搜尋項目名稱、摘要或操作者" aria-label="搜尋操作紀錄" /><select id="audit-entity" aria-label="依項目篩選"><option value="">所有項目</option><option value="post">文章</option><option value="media">圖片</option><option value="news">新聞</option><option value="news_import_batch">新聞匯入</option><option value="category">分類</option><option value="tag">標籤</option></select><select id="audit-action" aria-label="依動作篩選"><option value="">所有動作</option><option value="create">新增</option><option value="update">修改</option><option value="delete">刪除</option><option value="publish">發布</option><option value="unpublish">取消發布</option><option value="upload">上傳</option><option value="archive">封存</option><option value="restore">還原</option></select></div>
+      <p id="audit-status" class="muted" role="status">正在載入操作紀錄…</p>
+      <div class="table-scroll"><table class="admin-table"><thead><tr><th>時間</th><th>操作者</th><th>項目</th><th>動作</th><th>內容</th><th>詳細資料</th></tr></thead><tbody id="audit-rows"><tr><td colspan="6">正在讀取…</td></tr></tbody></table></div>
+      <div class="pager"><button type="button" class="category-chip" id="audit-prev" disabled>上一頁</button><span id="audit-page" class="muted">第 1 頁</span><button type="button" class="category-chip" id="audit-next" disabled>下一頁</button></div>
+    </section>
+    <dialog id="audit-detail" class="detail-dialog"><div class="section-heading"><h2 class="serif">異動詳細資料</h2><button type="button" id="close-detail" class="category-chip">關閉</button></div><p id="detail-summary" class="muted"></p><h3>異動前</h3><pre id="detail-before"></pre><h3>異動後</h3><pre id="detail-after"></pre><p id="detail-request" class="muted"></p></dialog>
+  </main>
+  <script is:inline type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    const $=s=>document.querySelector(s),size=50;let rows=[],page=0,total=0;
+    const entity={post:'文章',media:'圖片',news:'新聞',news_import_batch:'新聞匯入',category:'分類',tag:'標籤',post_tag:'文章標籤'};
+    const action={create:'新增',update:'修改',delete:'刪除',publish:'發布',unpublish:'取消發布',upload:'上傳',archive:'封存',restore:'還原'};
+    const date=v=>v?new Date(v).toLocaleString('zh-TW',{hour12:false}):'—';
+    function filtered(){const q=$('#audit-search').value.trim().toLowerCase(),e=$('#audit-entity').value,a=$('#audit-action').value;return rows.filter(r=>(!e||r.entity_type===e)&&(!a||r.action===a)&&(!q||[r.summary,r.actor_label,r.entity_id,r.entity_type].join(' ').toLowerCase().includes(q)));}
+    function showDetail(r){$('#detail-summary').textContent=r.summary+' · '+date(r.created_at)+' · '+(r.actor_label||'未知操作者');$('#detail-before').textContent=r.before_data?JSON.stringify(r.before_data,null,2):'（無異動前資料）';$('#detail-after').textContent=r.after_data?JSON.stringify(r.after_data,null,2):'（無異動後資料）';$('#detail-request').textContent=r.request_id?'請求識別碼：'+r.request_id:'';$('#audit-detail').showModal();}
+    function render(){const filteredRows=filtered(),start=page*size,items=filteredRows.slice(start,start+size),body=$('#audit-rows');body.replaceChildren();$('#audit-shown').textContent=String(filteredRows.length);if(!items.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=6;td.textContent='目前沒有符合條件的操作紀錄。';tr.append(td);body.append(tr);}
+      items.forEach(r=>{const tr=document.createElement('tr');[date(r.created_at),r.actor_label||'未知操作者',entity[r.entity_type]||r.entity_type,action[r.action]||r.action,r.summary].forEach(v=>{const td=document.createElement('td');td.textContent=v??'';tr.append(td);});const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.className='text-link';btn.textContent='查看';btn.addEventListener('click',()=>showDetail(r));td.append(btn);tr.append(td);body.append(tr);});
+      $('#audit-page').textContent='第 '+(page+1)+' 頁／共 '+Math.max(1,Math.ceil(filteredRows.length/size))+' 頁';$('#audit-prev').disabled=page===0;$('#audit-next').disabled=start+size>=filteredRows.length;}
+    async function load(){ $('#audit-status').textContent='正在載入操作紀錄…';const {data:{session},error:se}=await db.auth.getSession();if(se||!session)throw new Error('登入狀態已失效，請重新登入。');const {data:admin,error:ae}=await db.from('blog_admins').select('user_id').eq('user_id',session.user.id).maybeSingle();if(ae||!admin)throw new Error('目前帳號沒有拾光誌管理者權限。');const {data,count,error}=await db.from('blog_audit_logs').select('id,actor_id,actor_label,action,entity_type,entity_id,summary,before_data,after_data,request_id,created_at',{count:'exact'}).order('created_at',{ascending:false}).range(0,999);if(error)throw error;rows=data||[];total=count||0;page=0;$('#audit-total').textContent=String(total);$('#audit-latest').textContent=rows.length?date(rows[0].created_at):'—';$('#audit-status').textContent='已載入最近 '+rows.length+' 筆紀錄；目前最多顯示最新 1,000 筆。';render();}
+    ['#audit-search','#audit-entity','#audit-action'].forEach(s=>$(s).addEventListener(s==='#audit-search'?'input':'change',()=>{page=0;render();}));
+    $('#audit-prev').addEventListener('click',()=>{page=Math.max(0,page-1);render();});$('#audit-next').addEventListener('click',()=>{page++;render();});$('#refresh-audit').addEventListener('click',()=>load().catch(e=>$('#audit-status').textContent='載入失敗：'+e.message));$('#close-detail').addEventListener('click',()=>$('#audit-detail').close());
+    try{await load();}catch(e){$('#audit-status').textContent='無法載入操作紀錄：'+(e.message||'未知錯誤');}
+  </script>
+  <style>
+    .filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px}.filters input,.filters select{min-width:0;padding:10px 12px;border:1px solid var(--line);background:#fffefa;color:#26342d;font:inherit}
+    .pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px}.detail-dialog{width:min(760px,calc(100% - 24px));max-height:85vh;overflow:auto;border:1px solid var(--line);padding:20px;background:#fffefa;color:#26342d}.detail-dialog::backdrop{background:#18231dcc}.detail-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;background:#f2f2ec;padding:12px;border-radius:5px;font-size:12px}[hidden]{display:none!important}
+    @media(max-width:700px){.filters{grid-template-columns:1fr}.section-heading{align-items:flex-start;gap:12px;flex-direction:column}}
+  </style>
+</BaseLayout>
