@@ -1,11 +1,3 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import PostCard from '../../components/PostCard.astro';
-import { posts, categories } from '../../data/posts';
-export function getStaticPaths(){return categories.map((category)=>({params:{slug:encodeURIComponent(category)},props:{category}}));}
-const { category } = Astro.props;
-const filtered = posts.filter((p)=>p.category===category);
+export function getStaticPaths(){ return []; }
 ---
-<BaseLayout title={`${category}｜拾光誌`}>
-  <main class="container"><header class="page-intro"><div class="eyebrow">CATEGORY</div><h1>{category}</h1><p class="muted">這個主題下的所有文章。</p></header><div class="post-grid">{filtered.map((post)=><PostCard post={post}/>)}</div></main>
-</BaseLayout>
