@@ -56,11 +56,11 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     }catch(e){$('#article-status').textContent=e.message||'文章載入失敗。';console.error(e);}
   </script>
   <style>    .article-body{line-height:1.9}
-    .article-body img{max-width:100%;height:auto;border-radius:6px}
-    .article-body table{width:100%;border-collapse:collapse;margin:22px 0;display:block;overflow-x:auto}
-    .article-body th,.article-body td{border:1px solid var(--line);padding:10px 12px;text-align:left;min-width:90px}
-    .article-body th{background:#f1f2ec}
-    .article-body blockquote{border-left:3px solid var(--line);padding-left:16px;color:var(--muted)}
-    .article-body pre{overflow-x:auto;padding:14px;background:#f2f2ec;border-radius:5px}
+    .article-body :global(img){max-width:100%;height:auto;border-radius:6px}
+    .article-body :global(table){width:100%;border-collapse:collapse;margin:22px 0;display:block;overflow-x:auto}
+    .article-body :global(th),.article-body :global(td){border:1px solid var(--line);padding:10px 12px;text-align:left;min-width:90px}
+    .article-body :global(th){background:#f1f2ec}
+    .article-body :global(blockquote){border-left:3px solid var(--line);padding-left:16px;color:var(--muted)}
+    .article-body :global(pre){overflow-x:auto;padding:14px;background:#f2f2ec;border-radius:5px}
 </style>
 </BaseLayout>
