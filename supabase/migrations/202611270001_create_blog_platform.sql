@@ -12,7 +12,6 @@ create extension if not exists pgcrypto;
 create table if not exists public.blog_admins (
   user_id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
-  role text not null default 'owner' check (role in ('owner', 'editor')),
   created_at timestamptz not null default now()
 );
 
@@ -287,7 +286,10 @@ create policy "blog admins can read own allowlist"
 -- all writes require an administrator.
 create policy "public reads active blog categories"
   on public.blog_categories for select to anon, authenticated
-  using (is_active or public.is_blog_admin());
+  using (is_active);
+create policy "blog admins read all categories"
+  on public.blog_categories for select to authenticated
+  using (public.is_blog_admin());
 create policy "blog admins manage categories"
   on public.blog_categories for all to authenticated
   using (public.is_blog_admin()) with check (public.is_blog_admin());
@@ -349,7 +351,10 @@ create policy "blog admins update import batches"
 -- Site settings: public subset only; private settings are never exposed.
 create policy "public reads public site settings"
   on public.blog_site_settings for select to anon, authenticated
-  using (is_public or public.is_blog_admin());
+  using (is_public);
+create policy "blog admins read all site settings"
+  on public.blog_site_settings for select to authenticated
+  using (public.is_blog_admin());
 create policy "blog admins manage site settings"
   on public.blog_site_settings for all to authenticated
   using (public.is_blog_admin()) with check (public.is_blog_admin());
@@ -405,8 +410,8 @@ create policy "blog admins delete media objects"
   using (bucket_id = 'blog-media' and public.is_blog_admin());
 
 -- Bootstrap the first administrator after creating the Auth user:
--- insert into public.blog_admins (user_id, display_name, role)
--- values ('YOUR_AUTH_USER_UUID', 'Site Administrator', 'owner');
+-- insert into public.blog_admins (user_id, display_name)
+-- values ('YOUR_AUTH_USER_UUID', 'Site Administrator');
 --
 -- Audit note: the application must append a blog_audit_logs row for each
 -- successful mutation. For stronger guarantees, route mutations through
