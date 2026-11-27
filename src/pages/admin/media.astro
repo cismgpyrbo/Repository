@@ -37,8 +37,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     <form id="edit-form" method="dialog">
       <div class="section-heading"><h2 class="serif">編輯圖片資訊</h2><button class="category-chip" value="cancel" type="submit">關閉</button></div>
       <input id="edit-id" type="hidden" />
-      <label class="form-field">檔案名稱<input id="edit-file-name" disabled /></label>
+      <label class="form-field">檔案名稱（可更名，副檔名會保留）<input id="edit-file-name" maxlength="180" required /></label>
       <label class="form-field">資料夾<input id="edit-folder" maxlength="80" required /></label>
+      <p class="muted" id="rename-hint">更名會同步移動 Storage 檔案並更新資料庫路徑，既有文章封面關聯會保留。</p>
       <label class="form-field">替代文字<input id="edit-alt" maxlength="300" /></label>
       <label class="form-field">圖片說明<textarea id="edit-caption" rows="3" maxlength="500"></textarea></label>
       <div class="form-actions"><button class="button" id="save-edit" type="button">儲存修改</button><span id="edit-message" class="muted"></span></div>
@@ -157,7 +158,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 
     function openEdit(item) {
       editing=item;
-      $('#edit-id').value=item.id; $('#edit-file-name').value=item.file_name;
+      $('#edit-id').value=item.id;
+      $('#edit-file-name').value=item.file_name.replace(/\\.[^.]+$/, '');
       $('#edit-folder').value=item.folder; $('#edit-alt').value=item.alt_text;
       $('#edit-caption').value=item.caption;
       $('#edit-dialog').showModal();
@@ -168,14 +170,40 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const button=$('#save-edit');button.disabled=true;
       try {
         const user=await verifyAdmin();
+        const requestedName=$('#edit-file-name').value.trim();
+        const oldName=editing.file_name;
+        const extension=(oldName.match(/\\.[^.]+$/)||[''])[0];
+        const stem=requestedName.replace(/\\.[^.]+$/,'').trim();
+        const safeStem=stem.normalize('NFC').replace(/[\\/\\\\\\0-\\x1f\\x7f]/g,'-').replace(/\\s+/g,' ').replace(/^\\.+|\\.+$/g,'').slice(0,140);
+        if(!safeStem) throw new Error('請輸入有效的檔案名稱。');
+        const newName=safeStem+extension;
+        const oldPath=editing.storage_path;
+        let newPath=oldPath;
+        if(newName!==oldName) {
+          const slash=oldPath.lastIndexOf('/');
+          const oldLeaf=oldPath.slice(slash+1);
+          const prefix=oldLeaf.includes('_')?oldLeaf.slice(0,oldLeaf.indexOf('_')+1):'';
+          newPath=oldPath.slice(0,slash+1)+prefix+newName;
+          const {error:moveError}=await supabase.storage.from(bucket).move(oldPath,newPath);
+          if(moveError) throw new Error('Storage 檔案更名失敗：'+moveError.message);
+        }
         const {error}=await supabase.from('blog_media').update({
+          file_name:newName,
+          storage_path:newPath,
           folder:cleanFolder($('#edit-folder').value),
           alt_text:$('#edit-alt').value.trim(),
           caption:$('#edit-caption').value.trim(),
           updated_at:new Date().toISOString()
         }).eq('id',editing.id);
-        if(error) throw error;
+        if(error) {
+          if(newPath!==oldPath) {
+            const {error:rollbackError}=await supabase.storage.from(bucket).move(newPath,oldPath);
+            if(rollbackError) throw new Error('資料庫更新失敗，且檔案路徑回復失敗：'+error.message+'；'+rollbackError.message);
+          }
+          throw error;
+        }
         $('#edit-dialog').close();editing=null;await loadMedia();
+        message('#list-message',newName!==oldName?'檔案已更名並儲存資訊。':'圖片資訊已更新。');
       } catch(error) {message('#edit-message','儲存失敗：'+(error?.message || '未知錯誤'),true);}
       finally {button.disabled=false;}
     }
