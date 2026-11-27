@@ -36,44 +36,68 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     </section>
   </main>
   <script>
+    type ParsedNews = Record<string, string>;
     const input = document.querySelector<HTMLTextAreaElement>('#news-input');
     const results = document.querySelector<HTMLElement>('#parse-results');
     const list = document.querySelector<HTMLElement>('#result-list');
     const count = document.querySelector<HTMLElement>('#result-count');
     const parseButton = document.querySelector<HTMLButtonElement>('#parse-news');
-    const clean = (value: string) => value.replace(/^[-*]\s*/, '').trim();
-    const parseBlocks = (raw: string) => {
-      const blocks = raw.split(/(?=^##\s*新聞\s*\d+)/m).map((part) => part.trim()).filter(Boolean);
+
+    const normalizeEntities = (value: string) =>
+      value.replace(/【entity-[^¦】]+¦canonical_name=([^】]+)】/g, '$1').trim();
+
+    // Supports Meta AI's native title/date/category/source/url/summary/detail blocks,
+    // separated by ---; also accepts the earlier Chinese Markdown template.
+    const parseBlocks = (raw: string): ParsedNews[] => {
+      const normalized = raw.replace(/\r\n/g, '\n').trim();
+      const blocks = normalized.split(/^\s*---\s*$/m).map((part) => part.trim()).filter(Boolean);
+      const aliases: Record<string, string> = {
+        title: 'title', date: 'date', category: 'category', source: 'source',
+        url: 'url', summary: 'summary', detail: 'detail', keywords: 'keywords',
+        '新聞標題': 'title', '新聞日期': 'date', '新聞分類': 'category',
+        '新聞來源': 'source', '原始新聞網址': 'url', '新聞摘要': 'summary',
+        '詳細新聞整理': 'detail', '重要關鍵字': 'keywords'
+      };
       return blocks.map((block) => {
-        const fields: Record<string, string> = {};
-        const labels: Record<string, string> = {
-          '新聞標題': 'title', '新聞日期': 'date', '新聞分類': 'category',
-          '新聞來源': 'source', '原始新聞網址': 'url', '新聞摘要': 'summary',
-          '詳細新聞整理': 'detail', '重要關鍵字': 'keywords'
-        };
+        const fields: ParsedNews = {};
         let current = '';
-        for (const line of block.split(/\r?\n/)) {
-          const match = line.match(/^[-*]?\s*([^：:]+)[：:]\s*(.*)$/);
-          if (match && labels[match[1].trim()]) {
-            current = labels[match[1].trim()];
-            fields[current] = clean(match[2] || '');
+        for (const line of block.split('\n')) {
+          const match = line.match(/^\s*(?:[-*]\s*)?([^：:]+)[：:]\s*(.*)$/);
+          const key = match ? aliases[match[1].trim()] : undefined;
+          if (match && key) {
+            current = key;
+            fields[current] = normalizeEntities(match[2] || '');
           } else if (current && line.trim()) {
-            fields[current] = (fields[current] ? fields[current] + '\n' : '') + line.trim();
+            fields[current] = (fields[current] ? fields[current] + '\n' : '') + normalizeEntities(line.trim());
           }
         }
         return fields;
-      });
+      }).filter((item) => Object.keys(item).length > 0);
     };
+
     parseButton?.addEventListener('click', () => {
       const raw = input?.value.trim() ?? '';
       if (!raw) { alert('請先貼上 Meta AI 新聞內容。'); return; }
       const items = parseBlocks(raw);
-      if (!items.length) { alert('無法辨識新聞格式。請使用「## 新聞 1」及固定欄位格式。'); return; }
+      if (!items.length) {
+        alert('無法辨識新聞格式。請確認每則新聞包含 title/date/category/source/url/summary/detail，並以 --- 分隔。');
+        return;
+      }
       if (list) list.innerHTML = '';
       let valid = 0;
+      let warnings = 0;
       items.forEach((item, index) => {
-        const missing = ['title','date','category','source','url','summary','detail'].filter((key) => !item[key]);
-        const urlValid = !!item.url && /^https?:\/\//i.test(item.url);
+        const missing = ['title','date','category','source','url','summary','detail'].filter((key) => !item[key]?.trim());
+        const parsedUrl = item.url ? (() => { try { return new URL(item.url); } catch { return null; } })() : null;
+        const urlValid = !!parsedUrl && ['http:', 'https:'].includes(parsedUrl.protocol);
+        const suspiciousUrl = !!parsedUrl && (parsedUrl.pathname.includes('/admin/') || parsedUrl.hostname === 'example.com');
+        const isOverview = /總覽|每日新聞摘要/.test(item.category || '') || /最具影響力新聞摘要/.test(item.title || '');
+        const issues = [...missing.map((key) => '缺少 ' + key)];
+        if (item.url && !urlValid) issues.push('網址格式不正確');
+        if (suspiciousUrl) issues.push('網址看起來不是原始新聞報導頁，請確認');
+        if (isOverview) issues.push('這是每日總覽資料，建議作為新聞專題導言，不要與單則新聞混在一起');
+        if (issues.length) warnings++;
+
         const card = document.createElement('article');
         card.className = 'admin-panel';
         const title = document.createElement('h3');
@@ -84,21 +108,30 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
         const summary = document.createElement('p');
         summary.textContent = item.summary || '缺少摘要';
         const status = document.createElement('p');
-        status.className = missing.length || !urlValid ? 'muted' : 'eyebrow';
-        status.textContent = missing.length ? '待補欄位：' + missing.join('、') : (!urlValid ? '原始新聞網址格式不正確' : '欄位檢查通過（示範）');
-        card.append(title, info, summary, status);
+        status.className = issues.length ? 'muted' : 'eyebrow';
+        status.textContent = issues.length ? '需要檢查：' + issues.join('；') : '必要欄位完整（仍須人工核對新聞事實與來源）';
+        const detail = document.createElement('details');
+        const summaryLabel = document.createElement('summary');
+        summaryLabel.textContent = '查看詳細整理';
+        const detailText = document.createElement('p');
+        detailText.textContent = item.detail || '尚無詳細內容';
+        detail.append(summaryLabel, detailText);
+        card.append(title, info, summary, status, detail);
         list?.append(card);
-        if (!missing.length && urlValid) valid++;
+        if (!missing.length && urlValid && !suspiciousUrl && !isOverview) valid++;
       });
-      if (count) count.textContent = '辨識 ' + items.length + ' 則 · 欄位完整 ' + valid + ' 則';
+      if (count) count.textContent = '辨識 ' + items.length + ' 個區塊 · 可進入下一步 ' + valid + ' 則 · 需檢查 ' + warnings + ' 個區塊';
       if (results) results.hidden = false;
       results?.scrollIntoView({behavior:'smooth',block:'start'});
     });
+
     document.querySelector('#clear-news')?.addEventListener('click', () => {
       if (input) input.value = '';
       if (results) results.hidden = true;
       if (list) list.innerHTML = '';
     });
-    document.querySelector('#mock-publish')?.addEventListener('click', () => alert('這是 UI 原型：目前不會寫入資料庫或發布到公開網站。正式版將在確認後儲存新聞並觸發網站更新。'));
-  </script>
+    document.querySelector('#mock-publish')?.addEventListener('click', () =>
+      alert('這是 UI 原型：目前不會寫入資料庫或發布到公開網站。正式版會先儲存草稿，經人工確認後才發布。')
+    );
+  </script>t>
 </BaseLayout>
