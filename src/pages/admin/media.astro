@@ -159,7 +159,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     function openEdit(item) {
       editing=item;
       $('#edit-id').value=item.id;
-      $('#edit-file-name').value=item.file_name.replace(/\\.[^.]+$/, '');
+      $('#edit-file-name').value=item.file_name.replace(/\.[^.]+$/, '');
       $('#edit-folder').value=item.folder; $('#edit-alt').value=item.alt_text;
       $('#edit-caption').value=item.caption;
       $('#edit-dialog').showModal();
