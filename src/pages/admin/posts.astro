@@ -110,7 +110,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         const name=document.createElement('span');name.textContent=item.file_name;
         button.append(img,name);button.addEventListener('click',()=>{
           const alt=(item.alt_text||item.file_name).replace(/[\\[\\]]/g,'');
-          insertAtCursor('\\n\\n!['+alt+']('+imageUrl(item.storage_path)+')\\n\\n');
+          insertAtCursor('\n\n!['+alt+']('+imageUrl(item.storage_path)+')\n\n');
           $('#media-picker-dialog').close();
         });
         grid.append(button);
@@ -320,7 +320,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     $('#new-post').addEventListener('click',()=>openEditor());
     document.querySelectorAll('[data-insert]').forEach(button=>button.addEventListener('click',()=>{
       const kind=button.dataset.insert;
-      if(kind==='heading')insertAtCursor('\\n\\n## 小標題\\n');
+      if(kind==='heading')insertAtCursor('\n\n## 小標題\n');
       if(kind==='bold')insertAtCursor('**粗體文字**');
       if(kind==='italic')insertAtCursor('*斜體文字*');
       if(kind==='link')insertAtCursor('[連結文字](https://)');
@@ -330,8 +330,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const cols=Math.max(1,Math.min(8,Number(prompt('表格要幾個欄位？（1–8）','3'))||3));
       const header='| '+Array.from({length:cols},(_,i)=>'欄位 '+(i+1)).join(' | ')+' |';
       const divider='| '+Array(cols).fill('---').join(' | ')+' |';
-      const body=Array.from({length:rows},()=> '| '+Array(cols).fill('內容').join(' | ')+' |').join('\\n');
-      insertAtCursor('\\n\\n'+[header,divider,body].join('\\n')+'\\n\\n');
+      const body=Array.from({length:rows},()=> '| '+Array(cols).fill('內容').join(' | ')+' |').join('\n');
+      insertAtCursor('\n\n'+[header,divider,body].join('\n')+'\n\n');
     });
     $('#insert-media').addEventListener('click',()=>{renderMediaPicker();$('#media-picker-dialog').showModal();});
     $('#close-media-picker').addEventListener('click',()=>$('#media-picker-dialog').close());
