@@ -35,4 +35,4 @@
 已對 blog_tags 建立暫存資料列，確認 trigger 自動產生 create audit row，並在同一測試區塊清除測試資料與測試紀錄。已確認 7 組 audit triggers、RLS 及原有 2 條 audit policies。
 
 ## 限制
-操作紀錄反映資料庫實際完成的異動，不記錄失敗的操作嘗試。Supabase Storage 的物件操作若沒有同步完成 blog_media 中繼資料變更，不會單獨出現 Storage API 事件。新聞管理匯入頁目前仍是解析示範，尚未實際寫入新聞資料庫；在該匯入流程完成資料庫寫入前，不能產生對應的新聞匯入操作紀錄。
+操作紀錄反映資料庫實際完成的異動，不記錄失敗的操作嘗試。Supabase Storage 的物件操作若沒有同步完成 blog_media 中繼資料變更，不會單獨出現 Storage API 事件。手動新聞匯入已改由 blog_import_news_batch RPC 在單一資料庫交易中寫入批次及新聞草稿；批次與新聞資料列會由既有 triggers 自動留下紀錄。
