@@ -1,13 +1,16 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
+const supabaseUrl = 'https://aaynitbvfhxttrmlmvlf.supabase.co';
+const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
 ---
 <BaseLayout title="每日新聞匯入｜拾光誌">
   <main class="container admin-shell">
     <a class="text-link" href="/admin/news/">← 返回新聞管理</a>
     <div class="eyebrow" style="margin-top:28px">META AI DAILY IMPORT</div>
     <h1 class="serif">每日新聞匯入</h1>
-    <p class="muted">將 Meta AI 每日產製的新聞貼在下方。直接貼上 Meta AI 原始輸出即可，支援 title/date/category/source/url/summary/detail 欄位及 --- 分隔多則新聞。</p>
-    <div class="admin-panel">
+    <p class="muted">貼上 Meta AI 原始新聞內容，系統會解析多則新聞、檢查必要欄位及網址，再將通過檢查的內容一次寫入 Supabase。所有手動匯入內容預設為「草稿」，不會直接公開。</p>
+
+    <section class="admin-panel">
       <label for="news-input"><strong>Meta AI 新聞內容</strong></label>
       <textarea id="news-input" rows="18" style="display:block;width:100%;margin-top:14px;padding:16px;border:1px solid var(--line);background:#fffefa;line-height:1.8;resize:vertical" placeholder="title: 新聞標題
 date: 2026-11-27
@@ -16,6 +19,7 @@ source: 新聞來源
 url: https://example.com/news
 summary: 新聞摘要
 detail: 詳細新聞整理內容，可包含多行。
+keywords: AI,科技
 ---
 title: 第二則新聞
 date: 2026-11-27
@@ -25,115 +29,249 @@ url: https://example.com/second-news
 summary: 第二則摘要
 detail: 第二則詳細整理"></textarea>
       <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
-        <button class="button" id="parse-news" type="button">解析新聞內容</button>
+        <button class="button" id="parse-news" type="button">解析與檢查</button>
         <button class="category-chip" id="clear-news" type="button">清空</button>
       </div>
-      <p class="muted" style="font-size:12px">提醒：目前只在瀏覽器示範解析，不會儲存或公開發布。</p>
-    </div>
+      <p class="muted" style="font-size:12px;margin-top:12px">支援英文欄位及中文欄位（新聞標題、新聞日期、新聞分類、新聞來源、原始新聞網址、新聞摘要、詳細新聞整理、重要關鍵字），以單獨一行 --- 分隔不同新聞。也支援「每日新聞摘要」總覽文章。</p>
+    </section>
+
     <section id="parse-results" class="admin-panel" hidden>
       <div class="section-heading"><h2 class="serif">解析結果</h2><span id="result-count" class="text-link"></span></div>
+      <p id="parse-hint" class="muted"></p>
       <div id="result-list"></div>
-      <button class="button" id="mock-publish" type="button">確認示範發布</button>
-      <p class="muted" style="font-size:12px">正式版將在此處加入逐則編輯、重複檢查、草稿儲存及管理者確認發布。</p>
+      <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px">
+        <button class="button" id="import-news" type="button" disabled>將勾選內容匯入為草稿</button>
+        <button class="category-chip" id="reparse-news" type="button">重新解析</button>
+      </div>
+      <p id="import-status" class="muted" role="status" aria-live="polite" style="margin-top:14px"></p>
     </section>
   </main>
-  <script>
-    type ParsedNews = Record<string, string>;
-    const input = document.querySelector<HTMLTextAreaElement>('#news-input');
-    const results = document.querySelector<HTMLElement>('#parse-results');
-    const list = document.querySelector<HTMLElement>('#result-list');
-    const count = document.querySelector<HTMLElement>('#result-count');
-    const parseButton = document.querySelector<HTMLButtonElement>('#parse-news');
-
-    const normalizeEntities = (value: string) =>
-      value.replace(/【entity-[^¦】]+¦canonical_name=([^】]+)】/g, '$1').trim();
-
-    // Supports Meta AI's native title/date/category/source/url/summary/detail blocks,
-    // separated by ---; also accepts the earlier Chinese Markdown template.
-    const parseBlocks = (raw: string): ParsedNews[] => {
-      const normalized = raw.replace(/\r\n/g, '\n').trim();
-      const blocks = normalized.split(/^\s*---\s*$/m).map((part) => part.trim()).filter(Boolean);
-      const aliases: Record<string, string> = {
-        title: 'title', date: 'date', category: 'category', source: 'source',
-        url: 'url', summary: 'summary', detail: 'detail', keywords: 'keywords',
-        '新聞標題': 'title', '新聞日期': 'date', '新聞分類': 'category',
-        '新聞來源': 'source', '原始新聞網址': 'url', '新聞摘要': 'summary',
-        '詳細新聞整理': 'detail', '重要關鍵字': 'keywords'
-      };
-      return blocks.map((block) => {
-        const fields: ParsedNews = {};
-        let current = '';
-        for (const line of block.split('\n')) {
-          const match = line.match(/^\s*(?:[-*]\s*)?([^：:]+)[：:]\s*(.*)$/);
-          const key = match ? aliases[match[1].trim()] : undefined;
-          if (match && key) {
-            current = key;
-            fields[current] = normalizeEntities(match[2] || '');
-          } else if (current && line.trim()) {
-            fields[current] = (fields[current] ? fields[current] + '\n' : '') + normalizeEntities(line.trim());
-          }
-        }
-        return fields;
-      }).filter((item) => Object.keys(item).length > 0);
-    };
-
-    parseButton?.addEventListener('click', () => {
-      const raw = input?.value.trim() ?? '';
-      if (!raw) { alert('請先貼上 Meta AI 新聞內容。'); return; }
-      const items = parseBlocks(raw);
-      if (!items.length) {
-        alert('無法辨識新聞格式。請確認每則新聞包含 title/date/category/source/url/summary/detail，並以 --- 分隔。');
-        return;
-      }
-      if (list) list.innerHTML = '';
-      let valid = 0;
-      let warnings = 0;
-      items.forEach((item, index) => {
-        const missing = ['title','date','category','source','url','summary','detail'].filter((key) => !item[key]?.trim());
-        const parsedUrl = item.url ? (() => { try { return new URL(item.url); } catch { return null; } })() : null;
-        const urlValid = !!parsedUrl && ['http:', 'https:'].includes(parsedUrl.protocol);
-        const suspiciousUrl = !!parsedUrl && (parsedUrl.pathname.includes('/admin/') || parsedUrl.hostname === 'example.com');
-        const isOverview = /總覽|每日新聞摘要/.test(item.category || '') || /最具影響力新聞摘要/.test(item.title || '');
-        const issues = [...missing.map((key) => '缺少 ' + key)];
-        if (item.url && !urlValid) issues.push('網址格式不正確');
-        if (suspiciousUrl) issues.push('網址看起來不是原始新聞報導頁，請確認');
-        if (isOverview) issues.push('這是每日總覽資料，建議作為新聞專題導言，不要與單則新聞混在一起');
-        if (issues.length) warnings++;
-
-        const card = document.createElement('article');
-        card.className = 'admin-panel';
-        const title = document.createElement('h3');
-        title.textContent = item.title || '（缺少新聞標題）';
-        const info = document.createElement('p');
-        info.className = 'muted';
-        info.textContent = [item.date, item.category, item.source].filter(Boolean).join(' · ');
-        const summary = document.createElement('p');
-        summary.textContent = item.summary || '缺少摘要';
-        const status = document.createElement('p');
-        status.className = issues.length ? 'muted' : 'eyebrow';
-        status.textContent = issues.length ? '需要檢查：' + issues.join('；') : '必要欄位完整（仍須人工核對新聞事實與來源）';
-        const detail = document.createElement('details');
-        const summaryLabel = document.createElement('summary');
-        summaryLabel.textContent = '查看詳細整理';
-        const detailText = document.createElement('p');
-        detailText.textContent = item.detail || '尚無詳細內容';
-        detail.append(summaryLabel, detailText);
-        card.append(title, info, summary, status, detail);
-        list?.append(card);
-        if (!missing.length && urlValid && !suspiciousUrl && !isOverview) valid++;
-      });
-      if (count) count.textContent = '辨識 ' + items.length + ' 個區塊 · 可進入下一步 ' + valid + ' 則 · 需檢查 ' + warnings + ' 個區塊';
-      if (results) results.hidden = false;
-      results?.scrollIntoView({behavior:'smooth',block:'start'});
-    });
-
-    document.querySelector('#clear-news')?.addEventListener('click', () => {
-      if (input) input.value = '';
-      if (results) results.hidden = true;
-      if (list) list.innerHTML = '';
-    });
-    document.querySelector('#mock-publish')?.addEventListener('click', () =>
-      alert('這是 UI 原型：目前不會寫入資料庫或發布到公開網站。正式版會先儲存草稿，經人工確認後才發布。')
-    );
-  </script>
 </BaseLayout>
+
+<script is:inline type="module" define:vars={{ supabaseUrl, publishableKey, basePath: import.meta.env.BASE_URL }}>
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+  const supabase = createClient(supabaseUrl, publishableKey);
+  const input = document.getElementById('news-input');
+  const results = document.getElementById('parse-results');
+  const list = document.getElementById('result-list');
+  const count = document.getElementById('result-count');
+  const parseHint = document.getElementById('parse-hint');
+  const importButton = document.getElementById('import-news');
+  const importStatus = document.getElementById('import-status');
+  let parsedItems = [];
+
+  const normalizeEntities = (value) =>
+    value.replace(/【entity-[^¦】]+¦canonical_name=([^】]+)】/g, '$1').trim();
+
+  const aliases = {
+    title: 'title', date: 'date', category: 'category', source: 'source',
+    url: 'url', source_url: 'url', summary: 'summary', detail: 'detail',
+    content: 'detail', keywords: 'keywords', slug: 'slug',
+    '新聞標題': 'title', '新聞日期': 'date', '新聞分類': 'category',
+    '新聞來源': 'source', '原始新聞網址': 'url', '新聞摘要': 'summary',
+    '詳細新聞整理': 'detail', '重要關鍵字': 'keywords'
+  };
+
+  const parseBlocks = (raw) => {
+    const normalized = raw.replace(/\r\n/g, '\n').trim();
+    const blocks = normalized.split(/^\s*---\s*$/m).map((part) => part.trim()).filter(Boolean);
+    return blocks.map((block) => {
+      const fields = {};
+      let current = '';
+      for (const line of block.split('\n')) {
+        const match = line.match(/^\s*(?:[-*]\s*)?([^：:]+)[：:]\s*(.*)$/);
+        const key = match ? aliases[match[1].trim().toLowerCase()] || aliases[match[1].trim()] : undefined;
+        if (match && key) {
+          current = key;
+          fields[current] = normalizeEntities(match[2] || '');
+        } else if (current && line.trim()) {
+          fields[current] = (fields[current] ? fields[current] + '\n' : '') + normalizeEntities(line);
+        }
+      }
+      return fields;
+    }).filter((item) => Object.keys(item).length > 0);
+  };
+
+  const hashText = (value) => {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  };
+
+  const makeSlug = (item, index, isBriefing) => {
+    if (item.slug?.trim()) {
+      const supplied = item.slug.trim().toLowerCase()
+        .normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      if (supplied) return supplied;
+    }
+    if (isBriefing) return item.date + '-daily-briefing';
+    const titleSlug = item.title.toLowerCase().normalize('NFKD')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return titleSlug || ('news-' + item.date.replaceAll('-', '') + '-' + hashText(item.title + ':' + index));
+  };
+
+  const validateItem = (item, index, seenSlugs) => {
+    const missing = ['title','date','category','source','url','summary','detail']
+      .filter((key) => !item[key]?.trim());
+    const dateValid = /^\d{4}-\d{2}-\d{2}$/.test(item.date || '') &&
+      !Number.isNaN(Date.parse((item.date || '') + 'T00:00:00Z')) &&
+      new Date((item.date || '') + 'T00:00:00Z').toISOString().slice(0,10) === item.date;
+    const parsedUrl = item.url ? (() => { try { return new URL(item.url.trim()); } catch { return null; } })() : null;
+    const urlValid = !!parsedUrl && ['http:', 'https:'].includes(parsedUrl.protocol) && !!parsedUrl.hostname;
+    const isBriefing = /總覽|每日新聞摘要|最具影響力新聞摘要/.test((item.category || '') + ' ' + (item.title || ''));
+    const issues = missing.map((key) => '缺少 ' + key);
+    if (item.date && !dateValid) issues.push('日期必須是有效的 YYYY-MM-DD');
+    if (item.url && !urlValid) issues.push('網址格式不正確（只接受 http 或 https）');
+    if (parsedUrl && (parsedUrl.hostname === 'example.com' || parsedUrl.pathname.includes('/admin/'))) issues.push('網址疑似範例或管理頁，請改成原始新聞網址');
+    if (isBriefing && !/https?:\/\//i.test(item.url || '')) issues.push('每日總覽需要至少一個可核實的來源網址');
+    const slug = dateValid ? makeSlug(item, index, isBriefing) : '';
+    if (slug && seenSlugs.has(slug)) issues.push('本批次有重複 slug：' + slug);
+    if (slug) seenSlugs.add(slug);
+    return {
+      ...item,
+      slug,
+      content_type: isBriefing ? 'daily_briefing' : 'article',
+      category: isBriefing ? '每日新聞' : item.category,
+      keywords: (item.keywords || '').split(/[,，、]/).map((word) => word.trim()).filter(Boolean),
+      issues,
+      valid: issues.length === 0
+    };
+  };
+
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  const renderItems = () => {
+    list.replaceChildren();
+    parsedItems.forEach((item, index) => {
+      const card = el('article', 'admin-panel');
+      card.style.marginTop = '14px';
+      const top = el('div', 'section-heading');
+      const title = el('h3', 'serif', item.title || '（缺少新聞標題）');
+      const type = el('span', 'eyebrow', item.content_type === 'daily_briefing' ? '每日總覽' : '單則新聞');
+      top.append(title, type);
+      const meta = el('p', 'muted', [item.date, item.category, item.source].filter(Boolean).join(' · '));
+      const summary = el('p', '', item.summary || '缺少摘要');
+      const status = el('p', item.valid ? 'eyebrow' : 'muted',
+        item.valid ? '欄位檢查通過｜匯入後將儲存為草稿' : '無法匯入：' + item.issues.join('；'));
+      const details = document.createElement('details');
+      const summaryNode = document.createElement('summary');
+      summaryNode.textContent = '查看詳細內容與來源';
+      const detail = el('p', '', item.detail || '尚無詳細內容');
+      const source = document.createElement('a');
+      source.href = item.url || '#';
+      source.target = '_blank';
+      source.rel = 'noopener noreferrer';
+      source.textContent = item.url || '沒有來源網址';
+      details.append(summaryNode, detail, source);
+      const chooseLabel = el('label', '', '');
+      chooseLabel.style.display = 'inline-flex';
+      chooseLabel.style.alignItems = 'center';
+      chooseLabel.style.gap = '8px';
+      chooseLabel.style.marginTop = '12px';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = item.valid;
+      checkbox.disabled = !item.valid;
+      checkbox.dataset.index = String(index);
+      checkbox.addEventListener('change', () => {
+        item.selected = checkbox.checked;
+        updateImportButton();
+      });
+      item.selected = item.valid;
+      chooseLabel.append(checkbox, document.createTextNode(item.valid ? '選取匯入' : '此筆需修正後重新解析'));
+      card.append(top, meta, summary, status, details, chooseLabel);
+      list.append(card);
+    });
+    updateImportButton();
+  };
+
+  const updateImportButton = () => {
+    const selected = parsedItems.filter((item) => item.valid && item.selected).length;
+    importButton.disabled = selected === 0;
+    importButton.textContent = selected ? '將 ' + selected + ' 則內容匯入為草稿' : '沒有可匯入的選取內容';
+  };
+
+  const parse = () => {
+    const raw = input.value.trim();
+    if (!raw) { alert('請先貼上 Meta AI 新聞內容。'); return; }
+    const blocks = parseBlocks(raw);
+    if (!blocks.length) {
+      alert('無法辨識新聞格式。請確認每則新聞包含標題、日期、分類、來源、網址、摘要及詳細內容，並以 --- 分隔。');
+      return;
+    }
+    const seenSlugs = new Set();
+    parsedItems = blocks.map((item, index) => validateItem(item, index, seenSlugs));
+    const valid = parsedItems.filter((item) => item.valid).length;
+    const rejected = parsedItems.length - valid;
+    count.textContent = '辨識 ' + parsedItems.length + ' 則｜可匯入 ' + valid + ' 則｜需修正 ' + rejected + ' 則';
+    parseHint.textContent = '請核對標題、日期與來源。匯入時只會送出勾選且通過檢查的項目；未通過的項目會計入批次的拒絕數，不會寫入新聞文章。';
+    importStatus.textContent = '';
+    results.hidden = false;
+    renderItems();
+    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  document.getElementById('parse-news').addEventListener('click', parse);
+  document.getElementById('reparse-news').addEventListener('click', parse);
+  document.getElementById('clear-news').addEventListener('click', () => {
+    input.value = '';
+    results.hidden = true;
+    list.replaceChildren();
+    parsedItems = [];
+    importStatus.textContent = '';
+  });
+
+  importButton.addEventListener('click', async () => {
+    const selected = parsedItems.filter((item) => item.valid && item.selected);
+    if (!selected.length) return;
+    const rejectedCount = parsedItems.length - selected.length;
+    if (!confirm('確定將 ' + selected.length + ' 則新聞匯入 Supabase？\n匯入後全部會是草稿，不會直接公開。')) return;
+
+    importButton.disabled = true;
+    importStatus.textContent = '正在確認管理者身分並寫入資料庫…';
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData?.user) throw new Error('登入狀態已失效，請重新登入。');
+      const { data: adminRow, error: adminError } = await supabase
+        .from('blog_admins').select('user_id').eq('user_id', userData.user.id).maybeSingle();
+      if (adminError) throw adminError;
+      if (!adminRow) throw new Error('目前帳號不在網站管理者名單內。');
+
+      const payload = selected.map(({ title, date, category, source, url, summary, detail, keywords, slug, content_type }) => ({
+        title, date, category, source, url, summary, detail, keywords, slug, content_type
+      }));
+      const { data, error } = await supabase.rpc('blog_import_news_batch', {
+        p_raw_content: input.value.trim(),
+        p_items: payload,
+        p_rejected_count: rejectedCount
+      });
+      if (error) throw error;
+
+      const result = data || {};
+      importStatus.textContent =
+        '匯入完成。成功新增 ' + (result.inserted_count ?? 0) + ' 則；重複略過 ' +
+        (result.duplicate_count ?? 0) + ' 則；未匯入 ' + (result.rejected_count ?? 0) +
+        ' 則。全部新增內容均為草稿。批次編號：' + (result.batch_id || '已建立') + '。';
+      count.textContent = '本次處理 ' + (result.total_count ?? selected.length) + ' 則';
+      importButton.textContent = '匯入完成';
+      importButton.disabled = true;
+      const base = basePath.endsWith('/') ? basePath : basePath + '/';
+      const link = document.createElement('a');
+      link.href = base + 'admin/news/';
+      link.className = 'text-link';
+      link.textContent = '前往新聞管理查看匯入結果 →';
+      importStatus.append(document.createElement('br'), link);
+    } catch (error) {
+      importStatus.textContent = '匯入失敗，資料庫交易已取消，沒有完成本批次寫入。原因：' + (error?.message || '未知錯誤');
+      importButton.disabled = false;
+    }
+  });
+</script>
