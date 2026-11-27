@@ -128,7 +128,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
         supabase.from('blog_categories').select('id,name,slug,is_active,sort_order').order('sort_order'),
         supabase.from('blog_posts').select('id,title,slug,excerpt,content,category_id,cover_image_id,status,is_featured,seo_title,seo_description,published_at,author_id,created_at,updated_at').order('updated_at',{ascending:false}),
         supabase.from('blog_tags').select('id,name,slug').order('name'),
-        supabase.from('blog_post_tags').select('post_id,tag_id')
+        supabase.from('blog_post_tags').select('post_id,tag_id'),
+        supabase.from('blog_media').select('id,storage_path,file_name,alt_text,status').eq('status','active').order('created_at',{ascending:false})
       ]);
       const firstError = categoryResult.error || postResult.error || tagResult.error || postTagResult.error || mediaResult.error;
       if (firstError) throw firstError;
@@ -136,7 +137,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       posts=postResult.data || [];
       tags=tagResult.data || [];
       postTags=postTagResult.data || [];
-      renderCategories(); renderPosts();
+      mediaItems=mediaResult.data || [];
+      renderCategories(); renderPosts(); renderCoverOptions();
       $('#list-message').textContent='資料已同步。';
     }
 
