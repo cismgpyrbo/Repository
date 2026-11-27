@@ -1,0 +1,56 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+---
+<BaseLayout title="文章｜拾光誌">
+  <main class="container">
+    <article class="article" id="public-article">
+      <a class="text-link" href="/blog/">← 返回文章列表</a>
+      <p class="muted" id="article-status" role="status">正在載入文章…</p>
+      <div id="article-content" hidden>
+        <div class="eyebrow" id="article-category" style="margin-top:30px"></div>
+        <h1 id="article-title"></h1>
+        <div class="meta"><span id="article-date"></span></div>
+        <img class="article-cover" id="article-cover" alt="" />
+        <div class="article-body" id="article-body"></div>
+        <div id="article-tags" class="category-list"></div>
+        <div style="border-top:1px solid var(--line);padding-top:25px;margin-top:50px"><a class="text-link" href="/blog/">閱讀更多文章 →</a></div>
+      </div>
+    </article>
+  </main>
+  <script is:inline type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
+    const $=s=>document.querySelector(s);
+    const slug=new URLSearchParams(location.search).get('slug');
+    const imgUrl=path=>'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/');
+    function paragraphText(value){
+      const body=$('#article-body');body.replaceChildren();
+      String(value||'').split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+    }
+    try{
+      if(!slug)throw new Error('缺少文章網址代稱。');
+      const {data:post,error}=await db.from('blog_posts').select('id,title,slug,excerpt,content,category_id,cover_image_id,published_at,status').eq('slug',slug).eq('status','published').not('published_at','is',null).maybeSingle();
+      if(error)throw error;if(!post)throw new Error('找不到這篇文章，或文章尚未公開發布。');
+      const [cat,media,tags]=await Promise.all([
+        post.category_id?db.from('blog_categories').select('name').eq('id',post.category_id).maybeSingle():Promise.resolve({data:null,error:null}),
+        post.cover_image_id?db.from('blog_media').select('storage_path,alt_text').eq('id',post.cover_image_id).maybeSingle():Promise.resolve({data:null,error:null}),
+        db.from('blog_post_tags').select('tag_id').eq('post_id',post.id)
+      ]);
+      if(cat.error)throw cat.error;if(media.error)throw media.error;if(tags.error)throw tags.error;
+      $('#article-category').textContent=cat.data?.name||'未分類';
+      $('#article-title').textContent=post.title;
+      $('#article-date').textContent=post.published_at?new Date(post.published_at).toLocaleDateString('zh-TW'):'';
+      if(media.data){$('#article-cover').src=imgUrl(media.data.storage_path);$('#article-cover').alt=media.data.alt_text||post.title;}else{$('#article-cover').hidden=true;}
+      paragraphText(post.content);
+      if(tags.data?.length){
+        const ids=tags.data.map(x=>x.tag_id);
+        const {data:tagRows,error:tagError}=await db.from('blog_tags').select('id,name').in('id',ids);
+        if(tagError)throw tagError;
+        tagRows.forEach(t=>{const span=document.createElement('span');span.className='category-chip';span.textContent='# '+t.name;$('#article-tags').append(span);});
+      }
+      document.title=post.title+'｜拾光誌';
+      const desc=document.querySelector('meta[name="description"]');if(desc)desc.content=post.excerpt||post.title;
+      $('#article-status').hidden=true;$('#article-content').hidden=false;
+    }catch(e){$('#article-status').textContent=e.message||'文章載入失敗。';console.error(e);}
+  </script>
+</BaseLayout>
