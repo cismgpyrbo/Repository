@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { posts, categories } from '../../data/posts';
+---
+<BaseLayout title="所有文章｜拾光誌">
+  <main class="container">
+    <header class="page-intro"><div class="eyebrow">THE JOURNAL</div><h1>所有文章</h1><p class="muted">生活、閱讀、工作與創作的片段紀錄。</p></header>
+    <div class="search-row"><input id="post-search" type="search" placeholder="搜尋文章標題或摘要…" aria-label="搜尋文章" /><button class="button" id="clear-search" type="button">清除</button></div>
+    <div class="category-list" style="margin-bottom:32px"><button class="category-chip filter active" data-category="全部">全部</button>{categories.map((c)=><button class="category-chip filter" data-category={c}>{c}</button>)}</div>
+    <div class="post-grid" id="post-grid">{posts.map((post)=><div class="post-result" data-category={post.category} data-search={(post.title+' '+post.excerpt).toLowerCase()}><PostCard post={post}/></div>)}</div>
+    <p id="empty-state" class="muted" hidden>找不到符合條件的文章。</p>
+  </main>
+  <script>
+    const search = document.querySelector<HTMLInputElement>('#post-search');
+    const cards = [...document.querySelectorAll<HTMLElement>('.post-result')];
+    const filters = [...document.querySelectorAll<HTMLButtonElement>('.filter')];
+    let category = '全部';
+    function update(){const q=(search?.value??'').toLowerCase().trim();let shown=0;cards.forEach(card=>{const ok=(category==='全部'||card.dataset.category===category)&&(card.dataset.search??'').includes(q);card.hidden=!ok;if(ok)shown++});const empty=document.querySelector<HTMLElement>('#empty-state');if(empty)empty.hidden=shown>0;}
+    search?.addEventListener('input',update);
+    filters.forEach(btn=>btn.addEventListener('click',()=>{category=btn.dataset.category??'全部';filters.forEach(x=>x.classList.toggle('active',x===btn));update()}));
+    document.querySelector('#clear-search')?.addEventListener('click',()=>{if(search)search.value='';update()});
+  </script>
+</BaseLayout>
