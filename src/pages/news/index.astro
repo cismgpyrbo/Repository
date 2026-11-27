@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { newsArticles } from '../../data/news';
+const categories = [...new Set(newsArticles.map((item) => item.category))];
+---
+<BaseLayout title="每日新聞｜拾光誌" description="Meta AI 每日新聞整理與原始新聞來源。">
+  <main class="container">
+    <section class="page-intro">
+      <div class="eyebrow">DAILY NEWS DESK</div>
+      <h1>每日新聞</h1>
+      <p class="muted">每日整理值得關注的消息，保留新聞來源與原文連結。</p>
+    </section>
+    <section class="section" style="padding-top:10px">
+      <div class="section-heading"><div><div class="eyebrow">LATEST BRIEFING</div><h2>最新整理</h2></div><span class="text-link">共 {newsArticles.length} 則示範新聞</span></div>
+      <div class="category-list" style="margin-bottom:28px">
+        <a class="category-chip" href="/news/">全部新聞</a>
+        {categories.map((category) => <span class="category-chip">{category}</span>)}
+      </div>
+      {newsArticles.length ? <div class="post-grid">
+        {newsArticles.map((item) => <article class="post-card" style="background:var(--paper);padding:22px;border:1px solid var(--line)">
+          <div class="eyebrow">{item.category}</div>
+          <h3><a href={`/news/${item.slug}/`}>{item.title}</a></h3>
+          <div class="meta"><span>{item.newsDate}</span><span>{item.sourceName}</span></div>
+          <p class="excerpt">{item.summary}</p>
+          <a class="text-link" href={`/news/${item.slug}/`}>閱讀整理 →</a>
+        </article>)}
+      </div> : <p class="muted">目前尚無已發布新聞。</p>}
+      <p class="muted" style="font-size:12px;margin-top:28px">目前顯示的是介面示範資料；正式版將改由 Supabase 提供已發布新聞。</p>
+    </section>
+  </main>
+</BaseLayout>
