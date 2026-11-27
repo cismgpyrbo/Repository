@@ -383,9 +383,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     .content-preview-panel{border:1px solid var(--line);padding:18px;background:#fffefa}
     .preview-label{font-size:11px;letter-spacing:.12em;color:var(--muted);margin-bottom:15px}
     .content-preview-panel .article-body{line-height:1.9;overflow-wrap:anywhere}
-    .content-preview-panel .article-body img{max-width:100%;height:auto}
-    .content-preview-panel .article-body table{width:100%;border-collapse:collapse;margin:18px 0}
-    .content-preview-panel .article-body th,.content-preview-panel .article-body td{border:1px solid var(--line);padding:8px;text-align:left}
+    .content-preview-panel .article-body :global(img){max-width:100%;height:auto}
+    .content-preview-panel .article-body :global(table){width:100%;border-collapse:collapse;margin:18px 0}
+    .content-preview-panel .article-body :global(th),.content-preview-panel .article-body :global(td){border:1px solid var(--line);padding:8px;text-align:left}
     .media-picker-dialog{width:min(760px,calc(100% - 24px));max-height:85vh;border:1px solid var(--line);padding:18px;background:#fffefa;color:#26342d}
     .media-picker-dialog::backdrop{background:#18231dcc}
     .media-picker-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
