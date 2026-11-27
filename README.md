@@ -52,3 +52,20 @@ Meta AI 每則新聞建議使用以下固定欄位：
 - 後台尚未接 Supabase Auth、RLS 或 Storage。
 - 正式版將以 Supabase 儲存新聞，透過受保護的發布流程觸發 GitHub Actions 重新建置。
 - 不應將新聞媒體的整篇原文直接複製發布；應使用自行整理的摘要與內容，並清楚標示來源及原文連結。
+
+
+## Supabase 資料庫規劃
+
+本專案沿用既有 Supabase 專案，所有本專案資料庫物件統一使用 `blog_*` 前綴，與同一 Supabase 專案中的其他系統隔離。
+
+Migration：
+- `supabase/migrations/202611270001_create_blog_platform.sql`
+
+預計建立：
+- `blog_admins`、`blog_posts`、`blog_categories`、`blog_tags`、`blog_post_tags`
+- `blog_news_import_batches`、`blog_news_articles`
+- `blog_site_settings`：網站公開/私有設定
+- `blog_media`：圖片中繼資料；實際圖片存放於 Supabase Storage 的 `blog-media` bucket
+- `blog_audit_logs`：管理者操作紀錄
+
+**注意：** Migration 已提交至 GitHub，但尚未在 Supabase SQL Editor 執行；網站目前也尚未連接 Supabase。執行前請先備份資料庫並確認專案參照碼。
