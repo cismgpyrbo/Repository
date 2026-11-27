@@ -12,7 +12,8 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
     const slug=new URLSearchParams(location.search).get('slug');
     const root=document.querySelector('#category-posts');
-    const siteBase=(document.querySelector('base')?.getAttribute('href')||'/').replace(/\/?$/,'/');\n    const imgUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1000&q=80';
+    const siteBase=(document.querySelector('base')?.getAttribute('href')||'/').replace(/\/?$/,'/');
+    const imgUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1000&q=80';
     try{
       if(!slug)throw new Error('缺少分類網址代稱。');
       const {data:category,error}=await db.from('blog_categories').select('id,name').eq('slug',slug).eq('is_active',true).maybeSingle();
