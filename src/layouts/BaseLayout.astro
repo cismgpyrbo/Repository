@@ -23,8 +23,6 @@ const { title = '拾光誌｜在日常裡拾起值得記錄的光', description 
     </header>
     <slot />
     <script is:inline>
-      // GitHub Pages project sites are hosted below /Repository/.
-      // Normalize root-relative internal links so they remain on this project site.
       (() => {
         const base = '/Repository';
         document.querySelectorAll('a[href^="/"]').forEach((link) => {
@@ -34,6 +32,45 @@ const { title = '拾光誌｜在日常裡拾起值得記錄的光', description 
           }
         });
       })();
+    </script>
+    <script is:inline type="module" define:vars={{ basePath: import.meta.env.BASE_URL }}>
+      import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+      const supabase = createClient('https://aaynitbvfhxttrmlmvlf.supabase.co', 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a', {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
+      const root = basePath.replace(/\\/$/, '');
+      const path = location.pathname.replace(/\\/$/, '') || '/';
+      const loginPath = root + '/admin/login';
+      const isAdminPage = path === root + '/admin' || path.startsWith(root + '/admin/');
+      const isLoginPage = path === loginPath || path === loginPath + '/';
+
+      if (isAdminPage && !isLoginPage) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          location.replace(loginPath + '/?next=' + encodeURIComponent(path + '/'));
+        } else {
+          const { data: admin, error } = await supabase
+            .from('blog_admins').select('user_id')
+            .eq('user_id', session.user.id).maybeSingle();
+          if (error || !admin) {
+            await supabase.auth.signOut();
+            location.replace(loginPath + '/?error=not_admin');
+          }
+        }
+      }
+
+      document.querySelectorAll('[data-admin-logout]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            button.disabled = false;
+            alert('登出失敗：' + error.message);
+            return;
+          }
+          location.replace(loginPath + '/');
+        });
+      });
     </script>
     <footer class="site-footer"><div class="container">© 2026 拾光誌 · 在日常裡拾起值得記錄的光</div></footer>
   </body>
