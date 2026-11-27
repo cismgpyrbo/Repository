@@ -5,7 +5,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
   <main class="container admin-shell">
     <div class="eyebrow">CONTENT MANAGEMENT</div>
     <div class="section-heading">
-      <div><h1 class="serif">文章管理</h1><p class="muted">文章資料直接儲存於 Supabase。公開網站目前仍採靜態頁面，發布後尚需網站重建才會更新前台。</p></div>
+      <div><h1 class="serif">文章管理</h1><p class="muted">文章資料直接儲存於 Supabase。公開網站會即時讀取已發布文章。</p></div>
       <button class="button" id="new-post" type="button">＋ 新增文章</button>
     </div>
 
@@ -17,7 +17,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <label class="form-field form-span-2">文章標題<input id="post-title" required maxlength="200" placeholder="輸入文章標題" /></label>
           <label class="form-field">網址代稱（Slug）<input id="post-slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="my-first-post" /><small>僅使用小寫英文字母、數字與連字號。</small></label>
           <label class="form-field">文章分類<select id="post-category"><option value="">未分類</option></select></label>
-          <label class="form-field form-span-2">封面圖片<select id="post-cover-image"><option value="">不設定封面圖片</option></select><small><a href="/admin/media/" target="_blank" rel="noopener">前往圖片管理</a> 上傳或整理圖片素材。</small><img id="post-cover-preview" alt="封面圖片預覽" hidden style="max-width:220px;max-height:140px;object-fit:contain;border:1px solid var(--line);padding:4px" /></label>
+          <label class="form-field form-span-2">封面圖片<select id="post-cover-image"><option value="">不設定封面圖片</option></select><small><a href="/admin/media/" target="_blank" rel="noopener">前往圖片管理</a> 上傳或整理圖片素材。</small><img id="post-cover-preview" alt="封面圖片預覽" hidden style="display:block;max-width:320px;max-height:220px;object-fit:contain;border:1px solid var(--line);padding:6px;background:#fff" /><small id="cover-preview-message" role="status">選取圖片後會顯示預覽。</small></label>
           <label class="form-field form-span-2">文章摘要<textarea id="post-excerpt" rows="2" maxlength="500" placeholder="顯示於文章列表的摘要"></textarea></label>
           <label class="form-field form-span-2">文章內容<textarea id="post-content" rows="12" placeholder="每段文字以空白行分隔。可先輸入純文字；Markdown 前台呈現會在後續整合。"></textarea></label>
           <label class="form-field">文章狀態<select id="post-status"><option value="draft">草稿</option><option value="published">已發布</option><option value="archived">已封存</option></select></label>
@@ -108,8 +108,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
       const item=mediaItems.find(x=>x.id===$('#post-cover-image').value);
       const preview=$('#post-cover-preview');
       if(!item){preview.hidden=true;preview.removeAttribute('src');return;}
+      preview.hidden=false;
+      preview.alt=item.alt_text || item.file_name || '封面圖片預覽';
+      preview.onerror=()=>{preview.hidden=true;const note=$('#cover-preview-message');if(note)note.textContent='圖片載入失敗，請至圖片管理確認檔案是否存在。';};
+      preview.onload=()=>{const note=$('#cover-preview-message');if(note)note.textContent='圖片預覽已載入。';};
+      const note=$('#cover-preview-message');if(note)note.textContent='圖片載入中…';
       preview.src='https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+item.storage_path.split('/').map(encodeURIComponent).join('/');
-      preview.alt=item.alt_text || '';preview.hidden=false;
     }
 
     function renderPosts() {
@@ -271,6 +275,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     $('#admin-search').addEventListener('input',renderPosts);
     $('#status-filter').addEventListener('change',renderPosts);
     $('#category-form').addEventListener('submit',createCategory);
+    $('#post-cover-image').addEventListener('change',updateCoverPreview);
     $('#post-title').addEventListener('input',()=>{if(!$('#post-id').value && !$('#post-slug').dataset.edited) $('#post-slug').value=slugify($('#post-title').value);});
     $('#post-slug').addEventListener('input',()=>{$('#post-slug').dataset.edited='true';});
     $('#post-slug').addEventListener('change',()=>{$('#post-slug').value=$('#post-slug').value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');});
