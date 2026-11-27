@@ -1,0 +1,10 @@
+---
+const { post } = Astro.props;
+---
+<article class="post-card">
+  <a href={`/blog/${post.slug}/`}><img src={post.cover} alt="" loading="lazy" /></a>
+  <div class="eyebrow" style="margin-top:16px">{post.category}</div>
+  <h3><a href={`/blog/${post.slug}/`}>{post.title}</a></h3>
+  <div class="meta"><span>{post.date}</span><span>{post.readTime}</span></div>
+  <p class="excerpt">{post.excerpt}</p>
+</article>
