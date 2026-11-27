@@ -1,24 +1,45 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import PostCard from '../../components/PostCard.astro';
-import { posts, categories } from '../../data/posts';
+
 ---
 <BaseLayout title="所有文章｜拾光誌">
   <main class="container">
     <header class="page-intro"><div class="eyebrow">THE JOURNAL</div><h1>所有文章</h1><p class="muted">生活、閱讀、工作與創作的片段紀錄。</p></header>
     <div class="search-row"><input id="post-search" type="search" placeholder="搜尋文章標題或摘要…" aria-label="搜尋文章" /><button class="button" id="clear-search" type="button">清除</button></div>
-    <div class="category-list" style="margin-bottom:32px"><button class="category-chip filter active" data-category="全部">全部</button>{categories.map((c)=><button class="category-chip filter" data-category={c}>{c}</button>)}</div>
-    <div class="post-grid" id="post-grid">{posts.map((post)=><div class="post-result" data-category={post.category} data-search={(post.title+' '+post.excerpt).toLowerCase()}><PostCard post={post}/></div>)}</div>
+    <div class="category-list" id="blog-categories" style="margin-bottom:32px"><button class="category-chip filter active" data-category="all" type="button">全部</button></div>
+    <div class="post-grid" id="post-grid"><p class="muted">正在讀取已發布文章…</p></div>
     <p id="empty-state" class="muted" hidden>找不到符合條件的文章。</p>
+    <p id="load-error" class="muted" role="status"></p>
   </main>
-  <script>
-    const search = document.querySelector<HTMLInputElement>('#post-search');
-    const cards = [...document.querySelectorAll<HTMLElement>('.post-result')];
-    const filters = [...document.querySelectorAll<HTMLButtonElement>('.filter')];
-    let category = '全部';
-    function update(){const q=(search?.value??'').toLowerCase().trim();let shown=0;cards.forEach(card=>{const ok=(category==='全部'||card.dataset.category===category)&&(card.dataset.search??'').includes(q);card.hidden=!ok;if(ok)shown++});const empty=document.querySelector<HTMLElement>('#empty-state');if(empty)empty.hidden=shown>0;}
-    search?.addEventListener('input',update);
-    filters.forEach(btn=>btn.addEventListener('click',()=>{category=btn.dataset.category??'全部';filters.forEach(x=>x.classList.toggle('active',x===btn));update()}));
-    document.querySelector('#clear-search')?.addEventListener('click',()=>{if(search)search.value='';update()});
+  <script is:inline type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.119.2';
+    const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
+    const $=s=>document.querySelector(s);let posts=[];let categories=[];let media=new Map();let category='all';
+    const articleUrl=slug=>'/blog/article/?slug='+encodeURIComponent(slug);
+    const imgUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1000&q=80';
+    function render(){
+      const q=($('#post-search').value||'').trim().toLowerCase();const grid=$('#post-grid');grid.replaceChildren();let shown=0;
+      posts.filter(p=>(category==='all'||p.category_id===category)&&[p.title,p.excerpt,p.slug].join(' ').toLowerCase().includes(q)).forEach(p=>{
+        shown++;const c=categories.find(x=>x.id===p.category_id);
+        const article=document.createElement('article');article.className='post-card';
+        const a=document.createElement('a');a.href=articleUrl(p.slug);const im=document.createElement('img');im.src=media.get(p.cover_image_id)||imgUrl(null);im.alt=p.title;im.loading='lazy';a.append(im);
+        const ey=document.createElement('div');ey.className='eyebrow';ey.style.marginTop='16px';ey.textContent=c?.name||'未分類';
+        const h=document.createElement('h3');const l=document.createElement('a');l.href=articleUrl(p.slug);l.textContent=p.title;h.append(l);
+        const meta=document.createElement('div');meta.className='meta';const d=document.createElement('span');d.textContent=p.published_at?new Date(p.published_at).toLocaleDateString('zh-TW'):'';meta.append(d);
+        const ex=document.createElement('p');ex.className='excerpt';ex.textContent=p.excerpt;article.append(a,ey,h,meta,ex);grid.append(article);
+      });
+      $('#empty-state').hidden=shown>0;
+    }
+    try{
+      const [p,c,m]=await Promise.all([
+        db.from('blog_posts').select('id,title,slug,excerpt,category_id,cover_image_id,published_at').eq('status','published').not('published_at','is',null).order('published_at',{ascending:false}),
+        db.from('blog_categories').select('id,name,slug').eq('is_active',true).order('sort_order'),
+        db.from('blog_media').select('id,storage_path').eq('status','active')
+      ]);
+      if(p.error)throw p.error;if(c.error)throw c.error;if(m.error)throw m.error;
+      posts=p.data||[];categories=c.data||[];(m.data||[]).forEach(x=>media.set(x.id,imgUrl(x.storage_path)));
+      const box=$('#blog-categories');categories.forEach(c=>{const b=document.createElement('button');b.type='button';b.className='category-chip filter';b.textContent=c.name;b.addEventListener('click',()=>{category=c.id;box.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));render();});box.append(b);});
+      $('#post-search').addEventListener('input',render);$('#clear-search').addEventListener('click',()=>{$('#post-search').value='';render();});render();
+    }catch(e){$('#post-grid').textContent='文章載入失敗，請稍後再試。';$('#load-error').textContent=e.message;console.error(e);}
   </script>
 </BaseLayout>
