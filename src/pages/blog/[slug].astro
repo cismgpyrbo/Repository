@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { posts } from '../../data/posts';
+export function getStaticPaths(){return posts.map((post)=>({params:{slug:post.slug},props:{post}}));}
+const { post } = Astro.props;
+---
+<BaseLayout title={`${post.title}｜拾光誌`} description={post.excerpt}>
+  <main class="container"><article class="article">
+    <a class="text-link" href="/blog/">← 返回文章列表</a>
+    <div class="eyebrow" style="margin-top:30px">{post.category}</div>
+    <h1>{post.title}</h1><div class="meta"><span>{post.date}</span><span>{post.readTime}</span></div>
+    <img class="article-cover" src={post.cover} alt="" />
+    <div class="article-body">{post.content.map((paragraph)=><p>{paragraph}</p>)}</div>
+    <div style="border-top:1px solid var(--line);padding-top:25px;margin-top:50px"><a class="text-link" href="/blog/">閱讀更多文章 →</a></div>
+  </article></main>
+</BaseLayout>
