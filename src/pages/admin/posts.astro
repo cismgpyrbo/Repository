@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { posts } from '../../data/posts';
+---
+<BaseLayout title="文章管理｜拾光誌">
+  <main class="container admin-shell"><div class="eyebrow">CONTENT MANAGEMENT</div><h1 class="serif">文章管理</h1><p class="muted">展示版操作不會寫入資料庫。</p><div class="admin-panel"><div class="section-heading"><h2 class="serif">文章列表</h2><button class="button" id="new-post">＋ 新增文章</button></div><div class="search-row"><input id="admin-search" placeholder="搜尋文章…" aria-label="搜尋文章"/><select id="status-filter" style="padding:12px;border:1px solid var(--line)"><option value="all">所有狀態</option><option value="published">已發布</option></select></div><table class="admin-table"><thead><tr><th>標題</th><th>分類</th><th>狀態</th><th>發布日期</th><th>操作</th></tr></thead><tbody id="admin-rows">{posts.map(p=><tr data-title={p.title.toLowerCase()}><td>{p.title}</td><td>{p.category}</td><td><span class="status">已發布</span></td><td>{p.date}</td><td><button class="text-link edit-post" type="button">編輯</button></td></tr>)}</tbody></table></div></main>
+  <script>
+    const search=document.querySelector<HTMLInputElement>('#admin-search');
+    const rows=[...document.querySelectorAll<HTMLTableRowElement>('#admin-rows tr')];
+    search?.addEventListener('input',()=>{const q=(search.value??'').toLowerCase();rows.forEach(r=>r.hidden=!(r.dataset.title??'').includes(q))});
+    document.querySelector('#new-post')?.addEventListener('click',()=>alert('展示版：正式版將開啟文章編輯器。'));
+    document.querySelectorAll('.edit-post').forEach(b=>b.addEventListener('click',()=>alert('展示版：正式版將載入文章編輯器。')));
+  </script>
+</BaseLayout>
