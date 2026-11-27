@@ -22,6 +22,11 @@ const latest = posts.filter((p) => p.slug !== featured.slug);
       <div class="section-heading"><div><div class="eyebrow">RECENT STORIES</div><h2>最近更新</h2></div><a class="text-link" href="/blog/">所有文章 →</a></div>
       <div class="post-grid">{latest.slice(0,3).map((post) => <PostCard post={post} />)}</div>
     </section>
+    <section class="section">
+      <div class="section-heading"><div><div class="eyebrow">DAILY NEWS DESK</div><h2>每日新聞</h2></div><a class="text-link" href="/news/">前往新聞中心 →</a></div>
+      <p class="excerpt">每日整理值得關注的消息，提供新聞摘要、完整整理與原始來源連結。</p>
+      <a class="button" href="/news/">閱讀每日新聞</a>
+    </section>
     <section class="section"><div class="section-heading"><div><div class="eyebrow">EXPLORE TOPICS</div><h2>依主題閱讀</h2></div></div><div class="category-list">{categories.map((category) => <a class="category-chip" href={`/category/${encodeURIComponent(category)}/`}>{category}　↗</a>)}</div></section>
   </main>
 </BaseLayout>
