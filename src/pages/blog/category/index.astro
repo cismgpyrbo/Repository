@@ -12,7 +12,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     const db=createClient('https://aaynitbvfhxttrmlmvlf.supabase.co','sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a');
     const slug=new URLSearchParams(location.search).get('slug');
     const root=document.querySelector('#category-posts');
-    const imgUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1000&q=80';
+    const siteBase=(document.querySelector('base')?.getAttribute('href')||'/').replace(/\/?$/,'/');\n    const imgUrl=path=>path?'https://aaynitbvfhxttrmlmvlf.supabase.co/storage/v1/object/public/blog-media/'+path.split('/').map(encodeURIComponent).join('/'):'https://images.unsplash.com/photo-1449247709967-d4461a6a6103?auto=format&fit=crop&w=1000&q=80';
     try{
       if(!slug)throw new Error('缺少分類網址代稱。');
       const {data:category,error}=await db.from('blog_categories').select('id,name').eq('slug',slug).eq('is_active',true).maybeSingle();
@@ -26,7 +26,7 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
       const media=new Map((m.data||[]).map(x=>[x.id,imgUrl(x.storage_path)]));root.replaceChildren();
       (p.data||[]).forEach(post=>{
         const card=document.createElement('article');card.className='post-card';
-        const a=document.createElement('a');a.href='/blog/article/?slug='+encodeURIComponent(post.slug);
+        const a=document.createElement('a');a.href=siteBase+'blog/article/?slug='+encodeURIComponent(post.slug);
         const img=document.createElement('img');img.src=media.get(post.cover_image_id)||imgUrl(null);img.alt=post.title;img.loading='lazy';a.append(img);
         const h=document.createElement('h3');const link=document.createElement('a');link.href=a.href;link.textContent=post.title;h.append(link);
         const meta=document.createElement('div');meta.className='meta';meta.textContent=post.published_at?new Date(post.published_at).toLocaleDateString('zh-TW'):'';
