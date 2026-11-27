@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="聯絡我｜拾光誌">
+  <main class="container"><header class="page-intro"><div class="eyebrow">CONTACT</div><h1>保持聯繫</h1><p class="muted">有想法、合作提案或閱讀心得，歡迎留下訊息。</p></header><form class="admin-panel" style="max-width:650px;margin-bottom:90px" id="contact-form"><label>稱呼<br/><input required name="name" style="width:100%;padding:13px;margin:8px 0 18px;border:1px solid var(--line)"/></label><label>Email<br/><input required type="email" name="email" style="width:100%;padding:13px;margin:8px 0 18px;border:1px solid var(--line)"/></label><label>訊息內容<br/><textarea required name="message" rows="5" style="width:100%;padding:13px;margin:8px 0 18px;border:1px solid var(--line)"></textarea></label><button class="button" type="submit">送出訊息</button><p class="muted" id="form-note">目前為介面展示，尚未連接郵件或表單服務。</p></form></main>
+  <script>document.querySelector<HTMLFormElement>('#contact-form')?.addEventListener('submit',(e)=>{e.preventDefault();const note=document.querySelector<HTMLElement>('#form-note');if(note)note.textContent='這是展示版，訊息尚未送出。正式版將接入表單服務。'});</script>
+</BaseLayout>
