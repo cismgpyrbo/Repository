@@ -26,3 +26,22 @@
 
 ## 重要限制
 此 GitHub Migration 是 SQL 原始檔，提交到 GitHub 不會自動執行到 Supabase。執行前請先備份並檢查 SQL；本次建立檔案不會連線或修改線上資料庫。
+
+## 部署前物件衝突檢查
+
+在執行 Migration 前，先於 SQL Editor 執行以下唯讀查詢，確認沒有同名資料表或函式：
+
+```sql
+select 'table' as object_type, table_name as object_name
+from information_schema.tables
+where table_schema = 'public'
+  and table_name like 'blog_%'
+union all
+select 'function' as object_type, routine_name as object_name
+from information_schema.routines
+where routine_schema = 'public'
+  and routine_name in ('is_blog_admin', 'blog_set_updated_at', 'blog_reject_audit_mutation')
+order by object_type, object_name;
+```
+
+若查詢有結果，先不要執行 Migration，應先確認這些物件是否屬於本專案及是否已有資料。此查詢不會修改資料庫。
