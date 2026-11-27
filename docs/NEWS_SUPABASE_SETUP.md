@@ -45,3 +45,19 @@ order by object_type, object_name;
 ```
 
 若查詢有結果，先不要執行 Migration，應先確認這些物件是否屬於本專案及是否已有資料。此查詢不會修改資料庫。
+
+## Migration 執行注意事項（重要）
+
+此版本 Migration 請視為**首次部署的一次性腳本**，不要在成功執行後再次整份執行。雖然部分物件使用 `IF NOT EXISTS`，但資料表約束與 RLS policies 並非全部可安全重複建立；中途失敗後直接重跑可能遇到「policy already exists」或「constraint already exists」等錯誤。
+
+若第一次執行發生錯誤：
+1. 不要立即重新執行整份 SQL。
+2. 保留 SQL Editor 的完整錯誤訊息與執行結果。
+3. 先查明哪些資料表、函式、trigger、policy、Storage bucket 已建立。
+4. 依實際狀態製作修復 SQL；不要直接刪除整個 `blog_*` 命名空間，除非已確認沒有需要保留的資料。
+
+本次部署前已確認：
+- `public` schema 沒有 `blog_*` 資料表或本 Migration 的三個函式。
+- `storage.buckets` 沒有 `blog-media` bucket。
+
+執行前仍須完成備份，並確認 Dashboard 的 Project Ref 為 `aaynitbvfhxttrmlmvlf`。Migration 執行成功後，才使用 Auth 使用者 UUID 執行第一位管理者 bootstrap INSERT。
