@@ -61,3 +61,15 @@ order by object_type, object_name;
 - `storage.buckets` 沒有 `blog-media` bucket。
 
 執行前仍須完成備份，並確認 Dashboard 的 Project Ref 為 `aaynitbvfhxttrmlmvlf`。Migration 執行成功後，才使用 Auth 使用者 UUID 執行第一位管理者 bootstrap INSERT。
+
+
+## 手動新聞匯入（2026-11-27）
+
+- 管理者由 `/admin/news/import/` 貼上 Meta AI 原始輸出，支援英文/中文欄位與 `---` 多則分隔。
+- 解析器檢查必要欄位、日期、HTTP(S) 來源網址、疑似範例網址及本批次 slug 重複。
+- 每日新聞總覽會以 `content_type='daily_briefing'` 匯入；其他內容為 `article`。
+- 按下匯入後，前端先用 Supabase Auth 驗證使用者並查詢 `blog_admins`；資料庫 RPC `blog_import_news_batch` 會再次驗證管理者權限。
+- RPC 使用 SECURITY INVOKER，在單一交易中建立 `blog_news_import_batches` 批次並新增 `blog_news_articles`。slug 重複會略過；任何資料庫錯誤會使整批交易回滾。
+- 手動匯入文章一律先存為 `draft`，不會直接公開。管理者在 `/admin/news/` 檢查後可逐篇發布或撤回為草稿。
+- 匯入批次紀錄顯示總數、新增、重複、未匯入數量；資料庫 audit triggers 自動追蹤批次與新聞資料列異動。
+- Migration：`supabase/migrations/202611270004_blog_manual_news_import.sql`。此 Migration 已在目前 Supabase 專案以 SQL 執行，GitHub 檔案用於版本控管。
