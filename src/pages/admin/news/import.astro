@@ -6,22 +6,24 @@ import BaseLayout from '../../../layouts/BaseLayout.astro';
     <a class="text-link" href="/admin/news/">← 返回新聞管理</a>
     <div class="eyebrow" style="margin-top:28px">META AI DAILY IMPORT</div>
     <h1 class="serif">每日新聞匯入</h1>
-    <p class="muted">將 Meta AI 每日產製的新聞貼在下方。支援依照指定格式輸出的多則新聞。</p>
+    <p class="muted">將 Meta AI 每日產製的新聞貼在下方。直接貼上 Meta AI 原始輸出即可，支援 title/date/category/source/url/summary/detail 欄位及 --- 分隔多則新聞。</p>
     <div class="admin-panel">
       <label for="news-input"><strong>Meta AI 新聞內容</strong></label>
-      <textarea id="news-input" rows="18" style="display:block;width:100%;margin-top:14px;padding:16px;border:1px solid var(--line);background:#fffefa;line-height:1.8;resize:vertical" placeholder="## 新聞 1
-
-- 新聞標題：
-- 新聞日期：
-- 新聞分類：
-- 新聞來源：
-- 原始新聞網址：
-- 新聞摘要：
-- 詳細新聞整理：
-- 重要關鍵字：
-
-## 新聞 2
-..."></textarea>
+      <textarea id="news-input" rows="18" style="display:block;width:100%;margin-top:14px;padding:16px;border:1px solid var(--line);background:#fffefa;line-height:1.8;resize:vertical" placeholder="title: 新聞標題
+date: 2026-11-27
+category: 財經
+source: 新聞來源
+url: https://example.com/news
+summary: 新聞摘要
+detail: 詳細新聞整理內容，可包含多行。
+---
+title: 第二則新聞
+date: 2026-11-27
+category: 科技
+source: 新聞來源
+url: https://example.com/second-news
+summary: 第二則摘要
+detail: 第二則詳細整理"></textarea>
       <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:16px">
         <button class="button" id="parse-news" type="button">解析新聞內容</button>
         <button class="category-chip" id="clear-news" type="button">清空</button>
