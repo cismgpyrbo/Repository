@@ -1,31 +1,166 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { newsArticles } from '../../data/news';
-const categories = [...new Set(newsArticles.map((item) => item.category))];
+const supabaseUrl = 'https://aaynitbvfhxttrmlmvlf.supabase.co';
+const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
 ---
-<BaseLayout title="每日新聞｜拾光誌" description="Meta AI 每日新聞整理與原始新聞來源。">
+<BaseLayout title="每日新聞｜拾光誌" description="每日新聞摘要與原始新聞來源。">
   <main class="container">
     <section class="page-intro">
       <div class="eyebrow">DAILY NEWS DESK</div>
       <h1>每日新聞</h1>
       <p class="muted">每日整理值得關注的消息，保留新聞來源與原文連結。</p>
     </section>
-    <section class="section" style="padding-top:10px">
-      <div class="section-heading"><div><div class="eyebrow">LATEST BRIEFING</div><h2>最新整理</h2></div><span class="text-link">共 {newsArticles.length} 則示範新聞</span></div>
-      <div class="category-list" style="margin-bottom:28px">
-        <a class="category-chip" href="/news/">全部新聞</a>
-        {categories.map((category) => <span class="category-chip">{category}</span>)}
+
+    <section id="news-list-view" class="section" style="padding-top:10px">
+      <div class="section-heading">
+        <div><div class="eyebrow">LATEST BRIEFING</div><h2>最新整理</h2></div>
+        <span id="news-count" class="text-link">正在載入新聞…</span>
       </div>
-      {newsArticles.length ? <div class="post-grid">
-        {newsArticles.map((item) => <article class="post-card" style="background:var(--paper);padding:22px;border:1px solid var(--line)">
-          <div class="eyebrow">{item.category}</div>
-          <h3><a href={`/news/${item.slug}/`}>{item.title}</a></h3>
-          <div class="meta"><span>{item.newsDate}</span><span>{item.sourceName}</span></div>
-          <p class="excerpt">{item.summary}</p>
-          <a class="text-link" href={`/news/${item.slug}/`}>閱讀整理 →</a>
-        </article>)}
-      </div> : <p class="muted">目前尚無已發布新聞。</p>}
-      <p class="muted" style="font-size:12px;margin-top:28px">目前顯示的是介面示範資料；正式版將改由 Supabase 提供已發布新聞。</p>
+      <div id="news-list" class="post-grid">
+        <p class="muted">正在從新聞資料庫載入已發布內容…</p>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:28px">新聞內容由每日新聞摘要整理後發布，請以各則原始來源及其後續更新為準。</p>
     </section>
+
+    <section id="news-detail-view" class="section" hidden style="padding-top:10px">
+      <a class="text-link" href="/news/">← 返回每日新聞</a>
+      <article class="article" style="padding-top:28px">
+        <div id="detail-category" class="eyebrow"></div>
+        <h1 id="detail-title"></h1>
+        <div id="detail-meta" class="meta"></div>
+        <div class="admin-panel" style="margin:28px 0">
+          <div class="eyebrow">SUMMARY</div>
+          <p id="detail-summary" class="excerpt"></p>
+        </div>
+        <div id="detail-content" class="article-body"></div>
+        <div style="border-top:1px solid var(--line);padding-top:25px;margin-top:45px">
+          <div class="eyebrow">ORIGINAL SOURCE</div>
+          <p id="detail-source" class="muted"></p>
+          <a id="detail-source-link" class="button" target="_blank" rel="noopener noreferrer" hidden>前往原始來源 →</a>
+        </div>
+        <p class="muted" style="font-size:12px;margin-top:30px">本文為新聞整理內容，請以原始新聞來源及其後續更新為準。</p>
+      </article>
+    </section>
+    <p id="news-error" class="muted" role="status" hidden></p>
   </main>
 </BaseLayout>
+
+<script is:inline type="module" define:vars={{ supabaseUrl, publishableKey, basePath: import.meta.env.BASE_URL }}>
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+  import { marked } from 'https://esm.sh/marked@15.0.7';
+  import DOMPurify from 'https://esm.sh/dompurify@3.2.6';
+
+  const supabase = createClient(supabaseUrl, publishableKey);
+  const base = basePath.endsWith('/') ? basePath : basePath + '/';
+  const $ = (id) => document.getElementById(id);
+  const listView = $('news-list-view');
+  const detailView = $('news-detail-view');
+  const list = $('news-list');
+  const errorBox = $('news-error');
+
+  const showError = (message) => {
+    errorBox.hidden = false;
+    errorBox.textContent = message;
+  };
+  const makeMeta = (parts) => {
+    const el = document.createElement('div');
+    el.className = 'meta';
+    parts.filter(Boolean).forEach((part) => {
+      const span = document.createElement('span');
+      span.textContent = part;
+      el.append(span);
+    });
+    return el;
+  };
+
+  async function loadList() {
+    const { data, error } = await supabase
+      .from('blog_news_articles')
+      .select('title,slug,news_date,category,source_name,summary,content_type,published_at')
+      .eq('status', 'published')
+      .order('news_date', { ascending: false })
+      .order('published_at', { ascending: false });
+
+    if (error) throw error;
+    $('news-count').textContent = '共 ' + (data?.length ?? 0) + ' 篇已發布';
+    list.replaceChildren();
+
+    if (!data?.length) {
+      const empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.textContent = '目前尚無已發布新聞。每日新聞摘要發布後，會自動顯示在這裡。';
+      list.append(empty);
+      return;
+    }
+
+    data.forEach((item) => {
+      const card = document.createElement('article');
+      card.className = 'post-card';
+      card.style.cssText = 'background:var(--paper);padding:22px;border:1px solid var(--line)';
+      const category = document.createElement('div');
+      category.className = 'eyebrow';
+      category.textContent = item.category || '每日新聞';
+      const title = document.createElement('h3');
+      const link = document.createElement('a');
+      link.href = base + 'news/?slug=' + encodeURIComponent(item.slug);
+      link.textContent = item.title;
+      title.append(link);
+      const summary = document.createElement('p');
+      summary.className = 'excerpt';
+      summary.textContent = item.summary || '';
+      const read = document.createElement('a');
+      read.className = 'text-link';
+      read.href = link.href;
+      read.textContent = '閱讀完整整理 →';
+      card.append(category, title, makeMeta([item.news_date, item.source_name]), summary, read);
+      list.append(card);
+    });
+  }
+
+  async function loadDetail(slug) {
+    const { data, error } = await supabase
+      .from('blog_news_articles')
+      .select('title,slug,news_date,category,source_name,source_url,summary,content,published_at')
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error('找不到這篇新聞，或文章尚未發布。');
+
+    listView.hidden = true;
+    detailView.hidden = false;
+    $('detail-category').textContent = (data.category || '每日新聞') + ' · 每日新聞整理';
+    $('detail-title').textContent = data.title;
+    $('detail-meta').replaceWith(makeMeta([
+      '新聞日期：' + data.news_date,
+      '整理發布：' + (data.published_at ? new Date(data.published_at).toLocaleString('zh-TW') : '—')
+    ]));
+    const meta = detailView.querySelector('.meta');
+    if (meta) meta.id = 'detail-meta';
+    $('detail-summary').textContent = data.summary || '';
+    $('detail-content').innerHTML = DOMPurify.sanitize(await marked.parse(data.content || ''));
+    $('detail-source').textContent = '新聞來源：' + (data.source_name || '多來源整理');
+    const sourceLink = $('detail-source-link');
+    if (data.source_url && data.source_url.startsWith('https://')) {
+      sourceLink.href = data.source_url;
+      sourceLink.hidden = false;
+    } else {
+      sourceLink.hidden = true;
+    }
+  }
+
+  try {
+    const slug = new URLSearchParams(location.search).get('slug');
+    if (slug) await loadDetail(slug);
+    else await loadList();
+  } catch (error) {
+    showError('新聞載入失敗：' + (error?.message || '未知錯誤') + '。請稍後重新整理。');
+    if (list && !list.children.length) {
+      const fallback = document.createElement('p');
+      fallback.className = 'muted';
+      fallback.textContent = '暫時無法取得新聞資料。';
+      list.append(fallback);
+    }
+  }
+</script>
