@@ -112,10 +112,10 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
       link.textContent = '返回新聞管理 →';
       statusNode.append(document.createElement('br'), link);
       if (!existing) {
-        existing = { id: data.id, published_at: payload.published_at };
+        existing = { id: data.id, published_at: payload.published_at, status: nextStatus };
         history.replaceState({}, '', location.pathname + '?id=' + encodeURIComponent(data.id));
         $('editor-heading').textContent = '編輯新聞';
-      } else if (payload.status === 'published') existing.published_at = payload.published_at;
+      } else { existing.status = nextStatus; if (payload.status === 'published') existing.published_at = payload.published_at; }
     } catch (error) {
       statusNode.textContent = '儲存失敗：' + (error?.message || '未知錯誤');
     } finally {
@@ -124,7 +124,7 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
     }
   }
 
-  $('news-form').addEventListener('submit', (event) => { event.preventDefault(); save('draft'); });
+  $('news-form').addEventListener('submit', (event) => { event.preventDefault(); save(existing?.status || 'draft'); });
   $('save-publish').addEventListener('click', () => {
     if (confirm('確定儲存並立即發布這則新聞？')) save('published');
   });
