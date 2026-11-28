@@ -1,11 +1,13 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminNav from '../../components/AdminNav.astro';
 ---
-<BaseLayout title="圖片管理｜拾光誌">
+<BaseLayout title="媒體庫｜拾光誌">
   <main class="container admin-shell">
+    <AdminNav />
     <div class="eyebrow">MEDIA LIBRARY</div>
     <div class="section-heading">
-      <div><h1 class="serif">圖片管理</h1><p class="muted">管理 Supabase Storage 的 blog-media 圖片素材。僅拾光誌管理者可以瀏覽、上傳、修改中繼資料及刪除。</p></div>
+      <div><h1 class="serif">媒體庫</h1><p class="muted">管理 Supabase Storage 的 blog-media 圖片素材。僅拾光誌管理者可以瀏覽、上傳、修改中繼資料及刪除。</p></div>
       <a class="category-chip" href="/admin/">返回管理儀表板</a>
     </div>
 
@@ -239,7 +241,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     $('#media-search').addEventListener('input',render);
     $('#folder-filter').addEventListener('change',render);
     try { await verifyAdmin(); await loadMedia(); }
-    catch(error) { message('#list-message','無法載入圖片管理：'+(error?.message || '未知錯誤'),true); }
+    catch(error) { message('#list-message','無法載入媒體庫：'+(error?.message || '未知錯誤'),true); }
   </script>
 
   <style>
