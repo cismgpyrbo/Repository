@@ -1,8 +1,10 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminNav from '../../components/AdminNav.astro';
 ---
 <BaseLayout title="文章管理｜拾光誌">
   <main class="container admin-shell">
+    <AdminNav />
     <div class="eyebrow">CONTENT MANAGEMENT</div>
     <div class="section-heading">
       <div><h1 class="serif">文章管理</h1><p class="muted">文章資料直接儲存於 Supabase。公開網站會即時讀取已發布文章。</p><a class="category-chip" href="/admin/" style="display:inline-block;margin-top:8px">← 返回管理後台</a></div>
@@ -17,7 +19,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
           <label class="form-field form-span-2">文章標題<input id="post-title" required maxlength="200" placeholder="輸入文章標題" /></label>
           <label class="form-field">網址代稱（Slug）<input id="post-slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="my-first-post" /><small>僅使用小寫英文字母、數字與連字號。</small></label>
           <label class="form-field">文章分類<select id="post-category"><option value="">未分類</option></select></label>
-          <label class="form-field form-span-2">封面圖片<select id="post-cover-image"><option value="">不設定封面圖片</option></select><small><a href="/admin/media/" target="_blank" rel="noopener">前往圖片管理</a> 上傳或整理圖片素材。</small><img id="post-cover-preview" alt="封面圖片預覽" hidden style="display:block;max-width:320px;max-height:220px;object-fit:contain;border:1px solid var(--line);padding:6px;background:#fff" /><small id="cover-preview-message" role="status">選取圖片後會顯示預覽。</small></label>
+          <label class="form-field form-span-2">封面圖片<select id="post-cover-image"><option value="">不設定封面圖片</option></select><small><a href="/admin/media/" target="_blank" rel="noopener">前往媒體庫</a> 上傳或整理圖片素材。</small><img id="post-cover-preview" alt="封面圖片預覽" hidden style="display:block;max-width:320px;max-height:220px;object-fit:contain;border:1px solid var(--line);padding:6px;background:#fff" /><small id="cover-preview-message" role="status">選取圖片後會顯示預覽。</small></label>
           <label class="form-field form-span-2">文章摘要<textarea id="post-excerpt" rows="2" maxlength="500" placeholder="顯示於文章列表的摘要"></textarea></label>
           <div class="form-field form-span-2 content-editor-field">
             <span>文章內容</span>
