@@ -1,0 +1,20 @@
+---
+const links = [
+  { href: '/admin/', label: '管理首頁' },
+  { href: '/admin/posts/', label: '文章管理' },
+  { href: '/admin/media/', label: '媒體庫' },
+  { href: '/admin/news/', label: '新聞管理' },
+  { href: '/admin/news/import/', label: '新聞匯入' },
+  { href: '/admin/audit/', label: '操作紀錄' },
+];
+const path = Astro.url.pathname;
+---
+<nav class="admin-global-nav" aria-label="管理後台導覽">
+  {links.map((item) => <a href={item.href} aria-current={path.replace(/\/$/, '') === item.href.replace(/\/$/, '') ? 'page' : undefined}>{item.label}</a>)}
+</nav>
+<style>
+  .admin-global-nav{position:sticky;top:0;z-index:1000;display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px max(16px,calc((100% - 1120px)/2));margin:0 0 24px;background:rgba(247,247,242,.96);border-bottom:1px solid var(--line);backdrop-filter:blur(12px)}
+  .admin-global-nav a{display:inline-flex;align-items:center;padding:8px 13px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--ink);font-size:14px;white-space:nowrap}
+  .admin-global-nav a[aria-current="page"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  @media(max-width:560px){.admin-global-nav{gap:6px;padding:8px 12px;overflow-x:auto;flex-wrap:nowrap}.admin-global-nav a{font-size:13px;padding:7px 11px}}
+</style>
