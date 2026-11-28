@@ -6,7 +6,7 @@ import AdminNav from '../../components/AdminNav.astro';
   <main class="container admin-shell">
     <AdminNav />
     <div class="eyebrow">AUDIT TRAIL</div>
-    <div class="section-heading admin-page-heading" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div class="section-heading admin-page-heading">
       <h1 class="serif">操作紀錄</h1>
       <a class="category-chip" href="/admin/">返回管理後台</a>
     </div>
@@ -41,6 +41,9 @@ import AdminNav from '../../components/AdminNav.astro';
   <style>
     .filters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:14px}.filters input,.filters select{min-width:0;padding:10px 12px;border:1px solid var(--line);background:#fffefa;color:#26342d;font:inherit}
     .pager{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:18px}.detail-dialog{width:min(760px,calc(100% - 24px));max-height:85vh;overflow:auto;border:1px solid var(--line);padding:20px;background:#fffefa;color:#26342d}.detail-dialog::backdrop{background:#18231dcc}.detail-dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;background:#f2f2ec;padding:12px;border-radius:5px;font-size:12px}[hidden]{display:none!important}
-    @media(max-width:700px){.filters{grid-template-columns:1fr}.section-heading{align-items:flex-start;gap:12px;flex-direction:column}}
+    .admin-page-heading{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:16px;width:100%;text-align:left!important;flex-wrap:nowrap}
+    .admin-page-heading h1{margin:0!important;text-align:left!important;flex:0 1 auto}
+    .admin-page-heading>a{flex:0 0 auto;margin-left:auto}
+    @media(max-width:700px){.filters{grid-template-columns:1fr}.section-heading:not(.admin-page-heading){align-items:flex-start;gap:12px;flex-direction:column}.admin-page-heading{flex-direction:row!important;align-items:center!important;justify-content:space-between!important;flex-wrap:wrap}.admin-page-heading h1{white-space:nowrap}}
   </style>
 </BaseLayout>
