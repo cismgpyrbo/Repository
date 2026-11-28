@@ -99,7 +99,7 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
     statusNode.textContent = '正在儲存…';
     try {
       let query;
-      if (existing) query = supabase.from('blog_news_articles').update(payload).eq('id', recordId).select('id').maybeSingle();
+      if (existing) query = supabase.from('blog_news_articles').update(payload).eq('id', existing.id).select('id').maybeSingle();
       else query = supabase.from('blog_news_articles').insert(payload).select('id').single();
       const { data, error } = await query;
       if (error) throw error;
