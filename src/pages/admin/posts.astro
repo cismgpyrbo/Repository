@@ -7,9 +7,10 @@ import AdminNav from '../../components/AdminNav.astro';
     <AdminNav />
     <div class="eyebrow">CONTENT MANAGEMENT</div>
     <div class="section-heading admin-page-heading" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
-      <div><h1 class="serif">文章管理</h1><p class="muted">文章資料直接儲存於 Supabase。公開網站會即時讀取已發布文章。</p></div>
+      <h1 class="serif">文章管理</h1>
       <div class="admin-page-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><a class="category-chip" href="/admin/">返回管理後台</a><button class="button" id="new-post" type="button">＋ 新增文章</button></div>
     </div>
+    <p class="muted">文章資料直接儲存於 Supabase。公開網站會即時讀取已發布文章。</p>
 
     <section class="admin-panel" id="editor-panel" hidden>
       <div class="section-heading"><h2 class="serif" id="editor-heading">新增文章</h2><button class="category-chip" id="close-editor" type="button">關閉</button></div>
