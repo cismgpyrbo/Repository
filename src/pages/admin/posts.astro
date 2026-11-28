@@ -6,9 +6,9 @@ import AdminNav from '../../components/AdminNav.astro';
   <main class="container admin-shell">
     <AdminNav />
     <div class="eyebrow">CONTENT MANAGEMENT</div>
-    <div class="section-heading admin-page-heading" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+    <div class="section-heading admin-page-heading">
       <h1 class="serif">文章管理</h1>
-      <div class="admin-page-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><a class="category-chip" href="/admin/">返回管理後台</a></div>
+      <div class="admin-page-actions"><a class="category-chip" href="/admin/">返回管理後台</a></div>
     </div>
     <p class="muted">文章資料直接儲存於 Supabase。公開網站會即時讀取已發布文章。</p>
     <div class="post-create-action"><button class="button" id="new-post" type="button">＋ 新增文章</button></div>
@@ -373,6 +373,9 @@ import AdminNav from '../../components/AdminNav.astro';
   </script>
 
   <style>
+    .admin-page-heading{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:16px;width:100%;text-align:left!important;flex-wrap:nowrap}
+    .admin-page-heading h1{margin:0!important;text-align:left!important;flex:0 1 auto}
+    .admin-page-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
     .admin-form{display:grid;gap:18px}
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     .form-span-2{grid-column:1/-1}
@@ -408,6 +411,6 @@ import AdminNav from '../../components/AdminNav.astro';
     .table-scroll{overflow-x:auto}
     .danger-link{color:#a33b32}
     [hidden]{display:none!important}
-    @media(max-width:700px){.form-grid,.category-create{grid-template-columns:1fr}.form-span-2{grid-column:auto}.section-heading{align-items:flex-start;gap:12px;flex-direction:column}}
+    @media(max-width:700px){.form-grid,.category-create{grid-template-columns:1fr}.form-span-2{grid-column:auto}.section-heading:not(.admin-page-heading){align-items:flex-start;gap:12px;flex-direction:column}.admin-page-heading{flex-direction:row!important;align-items:center!important;justify-content:space-between!important;flex-wrap:wrap}.admin-page-heading h1{white-space:nowrap}}
   </style>
 </BaseLayout>
