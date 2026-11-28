@@ -15,7 +15,7 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
       <div class="stat"><span class="muted">匯入批次</span><strong id="stat-batches">—</strong></div>
     </div>
     <div class="admin-panel">
-      <div class="section-heading"><h2 class="serif">每日新聞</h2><a class="button" href="/admin/news/import/">＋ 匯入新聞</a></div>
+      <div class="section-heading"><h2 class="serif">每日新聞</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="category-chip" href="/admin/news/edit/?new=1">＋ 新增新聞</a><a class="button" href="/admin/news/import/">匯入新聞</a></div></div>
       <p id="admin-news-status" class="muted">正在讀取 Supabase 新聞資料…</p>
       <div style="overflow-x:auto">
         <table class="admin-table">
@@ -129,6 +129,23 @@ const publishableKey = 'sb_publishable_NboWNFpuMgsFAP0j-_3keg_jQIGLI2a';
     }
     if (!data) {
       status.textContent = '更新未完成：資料未變更，請重新登入或確認管理者權限。';
+      return;
+    }
+    await loadNews();
+  }
+
+  async function deleteNews(item) {
+    const confirmed = confirm('確定永久刪除「' + item.title + '」？此操作無法復原。');
+    if (!confirmed) return;
+    status.textContent = '正在刪除新聞…';
+    const { data, error } = await supabase.from('blog_news_articles')
+      .delete().eq('id', item.id).select('id').maybeSingle();
+    if (error) {
+      status.textContent = '刪除失敗：' + error.message;
+      return;
+    }
+    if (!data) {
+      status.textContent = '刪除未完成：資料未變更，請確認管理者權限。';
       return;
     }
     await loadNews();
