@@ -7,7 +7,7 @@ const links = [
   { href: '/admin/news/import/', label: '新聞匯入' },
   { href: '/admin/audit/', label: '操作紀錄' },
 ];
-const path = Astro.url.pathname;
+const path = Astro.url.pathname.replace(/\\/$/, '');
 ---
 <nav class="admin-global-nav" aria-label="管理後台導覽">
   {links.map((item) => <a href={item.href} aria-current={path.replace(/\/$/, '') === item.href.replace(/\/$/, '') ? 'page' : undefined}>{item.label}</a>)}
